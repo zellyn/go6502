@@ -1,0 +1,123 @@
+* References
+- Detailed per-instruction timing, etc: http://www.masswerk.at/6502/6502_instruction_set.html
+- aaabbbcc-type breakdown: http://www.llx.com/~nparker/a2/opcodes.html
+- 6502 Hardware manual (KIM-1): http://users.telenet.be/kim1-6502/6502/hwman.html#AA
+- Stack explanation (annoying writing): http://homepage.ntlworld.com/cyborgsystems/CS_Main/6502/6502.htm#STACK
+- For doublechecking cycle counts: http://www.obelisk.demon.co.uk/6502/reference.html
+
+* Reset sequences
+- http://www.pagetable.com/?p=410
+
+** Reset/interrupt vectors
+|---------+-------------|
+| Address | Description |
+|---------+-------------|
+| $FFFE/F | IRQ         |
+| $FFFA/B | NMI         |
+| $FFFC/D | Reset       |
+|---------+-------------|
+
+* Misc references
+- http://axis.llx.com/~nparker/a2/opcodes.html
+
+* Timing
+aaabbbcc
+
+** cc = 01
+
+| aaa | opcode | flags |
+|-----+--------+-------|
+| 000 | ORA    | NZ    |
+| 001 | AND    | NZ    |
+| 010 | EOR    | NZ    |
+| 011 | ADC    | NZCV  |
+| 100 | STA    |       |
+| 101 | LDA    | NZ    |
+| 110 | CMP    | NZC   |
+| 111 | SBC    | NZCV  |
+
+| bbb | addressing mode |
+|-----+-----------------|
+| 000 | (zero page,X)   |
+| 001 | zero page       |
+| 010 | #immediate      |
+| 011 | absolute        |
+| 100 | (zero page),Y   |
+| 101 | zero page,X     |
+| 110 | absolute,Y      |
+| 111 | absolute,X      |
+
+| Addressing Mode | ORA |      | AND |      | EOR |      | ADC |      | STA |     | LDA |      | CMP |      | SBC |      |
+|-----------------+-----+------+-----+------+-----+------+-----+------+-----+-----+-----+------+-----+------+-----+------|
+| (zp,X)          |  01 | 2/6  |  21 | 2/6  |  41 | 2/6  |  61 | 2/6  |  81 | 2/6 | A1  | 2/6  | C1  | 2/6  | E1  | 2/6  |
+| zp              |  05 | 2/3  |  25 | 2/3  |  45 | 2/3  |  65 | 2/3  |  85 | 2/3 | A5  | 2/3  | C5  | 2/3  | E5  | 2/3  |
+| #               |  09 | 2/2  |  29 | 2/2  |  49 | 2/2  |  69 | 2/2  |     |     | A9  | 2/2  | C9  | 2/2  | E9  | 2/2  |
+| abs             |  0D | 3/4  |  2D | 3/4  |  4D | 3/4  |  6D | 3/4  |  8D | 3/4 | AD  | 3/4  | CD  | 3/4  | ED  | 3/4  |
+| (zp),Y          |  11 | 2/5* |  31 | 2/5* |  51 | 2/5* |  71 | 2/5* |  91 | 2/6 | B1  | 2/5* | D1  | 2/5* | F1  | 2/5* |
+| zp,X            |  15 | 2/4  |  35 | 2/4  |  55 | 2/4  |  75 | 2/4  |  95 | 2/4 | B5  | 2/4  | D5  | 2/4  | F5  | 2/4  |
+| abs,Y           |  19 | 3/4* |  39 | 3/4* |  59 | 3/4* |  79 | 3/4* |  99 | 3/5 | B9  | 3/4* | D9  | 3/4* | F9  | 3/4* |
+| abs,X           |  1D | 3/4* |  3D | 3/4* |  5D | 3/4* |  7D | 3/4* |  9D | 3/5 | BD  | 3/4* | DD  | 3/4* | FD  | 3/4* |
+
+(*) - add 1 to cycles if page boundary is crossed
+
+** cc = 10
+
+| aaa | opcode | flags |
+|-----+--------+-------|
+| 000 | ASL    | NZC   |
+| 001 | ROL    | NZC   |
+| 010 | LSR    | NZC   |
+| 011 | ROR    | NZC   |
+| 100 | STX    |       |
+| 101 | LDX    | NZ    |
+| 110 | DEC    | NZ    |
+| 111 | INC    | NZ    |
+
+| bbb | addressing mode |                       |
+|-----+-----------------+-----------------------|
+| 000 | #immediate      |                       |
+| 001 | zero page       |                       |
+| 010 | accumulator     |                       |
+| 011 | absolute        |                       |
+| 101 | zero page,X     | STX,LDX: zero page, Y |
+| 111 | absolute,X      | LDX: absolute,Y       |
+
+|             | ASL |     | ROL |     | LSR |     | ROR |     | STX |     | LDX |      | DEC |     | INC |     |
+|-------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+-----+-----+-----+-----|
+| #           |     |     |     |     |     |     |     |     |     |     | A2  | 2/2  |     |     |     |     |
+| zp          |  06 | 2/5 |  26 | 2/5 |  46 | 2/5 |  66 | 2/5 |  86 | 2/3 | A6  | 2/3  | C6  | 2/5 | E6  | 2/5 |
+| A           |  0A | 1/2 |  2A | 1/2 |  4A | 1/2 |  6A | 1/2 |     |     |     |      |     |     |     |     |
+| abs         |  0E | 3/6 |  2E | 3/6 |  4E | 3/6 |  6E | 3/6 |  8E | 3/4 | AE  | 3/4  | CE  | 3/3 | EE  | 3/6 |
+| zp,X/zp,Y   |  16 | 2/6 |  36 | 2/6 |  56 | 2/6 |  76 | 2/6 |  96 | 2/4 | B6  | 2/4  | D6  | 2/6 | F6  | 2/6 |
+| abs,X/abs,Y |  1E | 3/7 |  3E | 3/7 |  5E | 3/7 |  7E | 3/7 |  ?? |     | BE  | 3/4* | DE  | 3/7 | FE  | 3/7 |
+
+(*) - add 1 to cycles if page boundary is crossed
+
+** cc = 00
+
+| aaa | opcode    | flags |
+|-----+-----------+-------|
+| 001 | BIT       | NZV   |
+| 010 | JMP       |       |
+| 011 | JMP (abs) |       |
+| 100 | STY       |       |
+| 101 | LDY       |       |
+| 110 | CPY       | NZC   |
+| 111 | CPX       | NZC   |
+
+
+| bbb | addressing mode |
+|-----+-----------------|
+| 000 | #immediate      |
+| 001 | zero page       |
+| 011 | absolute        |
+| 101 | zero page,X     |
+| 111 | absolute,X      |
+
+|       | BIT |     | JMP |     | JMP() |     | STY |     | LDY |      | CPY |     | CPX |     |
+|-------+-----+-----+-----+-----+-------+-----+-----+-----+-----+------+-----+-----+-----+-----|
+| #     |     |     |     |     |       |     |     |     | A0  | 2/2  | C0  | 2/2 | E0  | 2/2 |
+| zp    | 24  | 2/3 |     |     |       |     |  84 | 2/3 | A4  | 2/3  | C4  | 2/3 | E4  | 2/3 |
+| abs   | 2C  | 3/4 | 4C  | 3/3 | 6C    | 3/5 |  8C | 3/4 | AC  | 3/4  | CC  | 3/4 | EC  | 3/4 |
+| zp,X  |     |     |     |     |       |     |  94 | 2/4 | B4  | 2/4  |     |     |     |     |
+| abs,X |     |     |     |     |       |     |     |     | BC  | 3/4* |     |     |     |     |
