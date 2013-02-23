@@ -3,6 +3,7 @@
 
   TODO(zellyn): Provide configurable options
   TODO(zellyn): Implement IRQ, NMI
+  TODO(zellyn): Does BRK on 65C02 CLD?
 */
 
 package cpu
@@ -11,18 +12,10 @@ import (
 	"fmt"
 )
 
-/* Bugs and Quirks.
-   See http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks
-*/
+// See http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks
 const (
-	// TODO(zellyn) implement
-	// JMP xxFF reads xx00 instead of (xx+1)00
-	OPTION_BUG_JMP_FF                                = true
-	OPTION_BUG_INDEXED_ADDR_ACROSS_PAGE_INVALID_READ = true
-	OPTION_BUG_READ_MODIFY_WRITE_TWO_WRITES          = true
-	OPTION_BUG_NVZ_INVALID_IN_BCD                    = true
-	OPTION_BUG_NO_CLD_ON_INTERRUPT                   = true
-	OPTION_BUG_INTERRUPTS_CLOBBER_BRK                = true
+	VERSION_6502 = iota
+	VERSION_65C02
 )
 
 type Cpu interface {
@@ -63,6 +56,7 @@ const (
 	FLAG_UNUSED
 	FLAG_V
 	FLAG_N
+	FLAG_NV = FLAG_N | FLAG_V
 )
 
 type registers struct {
@@ -75,13 +69,15 @@ type registers struct {
 }
 
 type cpu struct {
-	m Memory
-	t Ticker
-	r registers
+	m       Memory
+	t       Ticker
+	r       registers
+	oldPC   uint16
+	version int
 }
 
-func NewCPU(memory Memory, ticker Ticker) Cpu {
-	c := cpu{m: memory, t: ticker}
+func NewCPU(memory Memory, ticker Ticker, version int) Cpu {
+	c := cpu{m: memory, t: ticker, version: version}
 	c.r.P |= FLAG_UNUSED // Set unused flag to 1
 	return &c
 }
@@ -113,18 +109,24 @@ func (c *cpu) Reset() {
 	c.r.SP = 0
 	c.r.PC = c.readWord(RESET_VECTOR)
 	c.r.P |= FLAG_I // Turn interrupts off
-	if !OPTION_BUG_NO_CLD_ON_INTERRUPT {
+	switch c.version {
+	case VERSION_6502:
+		// 6502 doesn't CLD on interrupt
 		c.r.P &^= FLAG_D
+	case VERSION_65C02:
+	default:
+		panic("Unknown chip version")
 	}
 }
 
 func (c *cpu) Step() error {
+	c.oldPC = c.r.PC
 	i := c.m.Read(c.r.PC)
 	c.r.PC++
 	c.t.Tick()
 
-	if f, ok := opcodes[i]; ok {
-		f(c)
+	if op, ok := Opcodes[i]; ok {
+		op.function(c)
 		return nil
 	}
 
