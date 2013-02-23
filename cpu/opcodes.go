@@ -50,6 +50,8 @@ var NoOp = Opcode{"???", MODE_IMPLIED, nil}
 
 // The list of Opcodes.
 var Opcodes = map[byte]Opcode{
+	// BUG(zellyn): Add 65C02 instructions.
+
 	// Flag set and clear
 	0x18: {"CLC", MODE_IMPLIED, clearFlag(FLAG_C)}, // CLC
 	0xD8: {"CLD", MODE_IMPLIED, clearFlag(FLAG_D)}, // CLD

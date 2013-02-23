@@ -1,23 +1,22 @@
-/*
-  6502 implementation.
-
-  TODO(zellyn): Provide configurable options
-  TODO(zellyn): Implement IRQ, NMI
-  TODO(zellyn): Does BRK on 65C02 CLD?
-*/
-
 package cpu
+
+// BUG(zellyn): Implement IRQ, NMI.
+
+// BUG(zellyn): implement interrupts, and 6502/65C02
+// decimal-mode-clearing and BRK-skipping quirks.  See
+// http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks.
 
 import (
 	"fmt"
 )
 
-// See http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks
+// Chip versions.
 const (
 	VERSION_6502 = iota
 	VERSION_65C02
 )
 
+// Interface for the Cpu type.
 type Cpu interface {
 	Reset()
 	Step() error
@@ -28,18 +27,21 @@ type Cpu interface {
 	PC() uint16
 	P() byte // [NV-BDIZC]
 	SP() byte
-	// TODO(zellyn): Add signaling of interrupts
+	// BUG(zellyn): Add signaling of interrupts.
 }
 
+// Memory interface, for all memory access.
 type Memory interface {
 	Read(uint16) byte
 	Write(uint16, byte)
 }
 
+// Ticker interface, for keeping track of cycles.
 type Ticker interface {
 	Tick()
 }
 
+// Interrupt vectors.
 const (
 	STACK_BASE   = 0x100
 	IRQ_VECTOR   = 0xFFFE
@@ -47,6 +49,7 @@ const (
 	RESET_VECTOR = 0xFFFC
 )
 
+// Flag masks.
 const (
 	FLAG_C = 1 << iota
 	FLAG_Z
@@ -76,6 +79,7 @@ type cpu struct {
 	version int
 }
 
+// Create and return a new Cpu object with the given memory, ticker, and of the given version.
 func NewCPU(memory Memory, ticker Ticker, version int) Cpu {
 	c := cpu{m: memory, t: ticker, version: version}
 	c.r.P |= FLAG_UNUSED // Set unused flag to 1
@@ -101,10 +105,12 @@ func (c *cpu) SP() byte {
 	return c.r.SP
 }
 
+// Helper for reading a word of memory.
 func (c *cpu) readWord(address uint16) uint16 {
 	return uint16(c.m.Read(address)) + (uint16(c.m.Read(address+1)) << 8)
 }
 
+// Reset performs a reset.
 func (c *cpu) Reset() {
 	c.r.SP = 0
 	c.r.PC = c.readWord(RESET_VECTOR)
@@ -119,6 +125,7 @@ func (c *cpu) Reset() {
 	}
 }
 
+// Step takes a single step (which will last several cycles, calling Tick() on the Ticker for each).
 func (c *cpu) Step() error {
 	c.oldPC = c.r.PC
 	i := c.m.Read(c.r.PC)
@@ -133,15 +140,7 @@ func (c *cpu) Step() error {
 	return fmt.Errorf("Unknown opcode at location $%04X: $%02X", c.r.PC, i)
 }
 
+// Set the program counter.
 func (c *cpu) SetPC(address uint16) {
 	c.r.PC = address
-}
-
-func (c *cpu) SetNZ(value byte) {
-	c.r.P = (c.r.P &^ FLAG_N) | (value & FLAG_N)
-	if value == 0 {
-		c.r.P |= FLAG_Z
-	} else {
-		c.r.P &^= FLAG_Z
-	}
 }

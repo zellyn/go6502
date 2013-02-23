@@ -1,5 +1,13 @@
 package cpu
 
+// BUG(zellyn): 6502 should do invalid reads when doing indexed
+// addressing across page boundaries. See
+// http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks.
+
+// BUG(zellyn): rmw instructions should write old data back on 6502,
+// read twice on 65C02. See
+// http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks.
+
 // immediate2 performs 2-opcode, 2-cycle immediate mode instructions.
 func immediate2(f func(*cpu, byte)) func(*cpu) {
 	return func(c *cpu) {

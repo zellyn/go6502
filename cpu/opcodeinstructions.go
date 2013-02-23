@@ -2,6 +2,16 @@ package cpu
 
 // Helpers and instruction-builders
 
+// setNZ uses the given value to set the N and Z flags.
+func (c *cpu) setNZ(value byte) {
+	c.r.P = (c.r.P &^ FLAG_N) | (value & FLAG_N)
+	if value == 0 {
+		c.r.P |= FLAG_Z
+	} else {
+		c.r.P &^= FLAG_Z
+	}
+}
+
 // samePage is a helper that returns true if two memory addresses
 // refer to the same page.
 func samePage(a1 uint16, a2 uint16) bool {
@@ -62,7 +72,7 @@ func adc(c *cpu, value byte) {
 		c.r.P |= FLAG_V
 	}
 	c.r.A = result
-	c.SetNZ(result)
+	c.setNZ(result)
 }
 
 // adc_d performs decimal-mode add-with-carry.
@@ -105,7 +115,7 @@ func adc_d(c *cpu, value byte) {
 		}
 	case VERSION_65C02:
 		c.t.Tick()
-		c.SetNZ(byte(a & 0xFF))
+		c.setNZ(byte(a & 0xFF))
 	default:
 		panic("Unknown chip version")
 	}
@@ -113,13 +123,13 @@ func adc_d(c *cpu, value byte) {
 
 func and(c *cpu, value byte) {
 	c.r.A &= value
-	c.SetNZ(c.r.A)
+	c.setNZ(c.r.A)
 }
 
 func asl(c *cpu, value byte) byte {
 	result := value << 1
 	c.r.P = (c.r.P &^ FLAG_C) | (value >> 7)
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
@@ -166,7 +176,7 @@ func cmp(c *cpu, value byte) {
 	if c.r.A >= value {
 		c.r.P |= FLAG_C
 	}
-	c.SetNZ(v)
+	c.setNZ(v)
 }
 
 func cpx(c *cpu, value byte) {
@@ -175,7 +185,7 @@ func cpx(c *cpu, value byte) {
 	if c.r.X >= value {
 		c.r.P |= FLAG_C
 	}
-	c.SetNZ(v)
+	c.setNZ(v)
 }
 
 func cpy(c *cpu, value byte) {
@@ -184,47 +194,47 @@ func cpy(c *cpu, value byte) {
 	if c.r.Y >= value {
 		c.r.P |= FLAG_C
 	}
-	c.SetNZ(v)
+	c.setNZ(v)
 }
 
 func dec(c *cpu, value byte) byte {
 	result := value - 1
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
 func dex(c *cpu) {
 	c.r.X--
-	c.SetNZ(c.r.X)
+	c.setNZ(c.r.X)
 	c.t.Tick()
 }
 
 func dey(c *cpu) {
 	c.r.Y--
-	c.SetNZ(c.r.Y)
+	c.setNZ(c.r.Y)
 	c.t.Tick()
 }
 
 func eor(c *cpu, value byte) {
 	c.r.A ^= value
-	c.SetNZ(c.r.A)
+	c.setNZ(c.r.A)
 }
 
 func inc(c *cpu, value byte) byte {
 	result := value + 1
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
 func inx(c *cpu) {
 	c.r.X++
-	c.SetNZ(c.r.X)
+	c.setNZ(c.r.X)
 	c.t.Tick()
 }
 
 func iny(c *cpu) {
 	c.r.Y++
-	c.SetNZ(c.r.Y)
+	c.setNZ(c.r.Y)
 	c.t.Tick()
 }
 
@@ -294,29 +304,29 @@ func jsr(c *cpu) {
 
 func lda(c *cpu, value byte) {
 	c.r.A = value
-	c.SetNZ(value)
+	c.setNZ(value)
 }
 
 func ldx(c *cpu, value byte) {
 	c.r.X = value
-	c.SetNZ(value)
+	c.setNZ(value)
 }
 
 func ldy(c *cpu, value byte) {
 	c.r.Y = value
-	c.SetNZ(value)
+	c.setNZ(value)
 }
 
 func lsr(c *cpu, value byte) byte {
 	result := (value >> 1)
 	c.r.P = (c.r.P &^ FLAG_C) | (value & FLAG_C)
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
 func ora(c *cpu, value byte) {
 	c.r.A |= value
-	c.SetNZ(c.r.A)
+	c.setNZ(c.r.A)
 }
 
 func nop(c *cpu) {
@@ -355,14 +365,14 @@ func plp(c *cpu) {
 func rol(c *cpu, value byte) byte {
 	result := value<<1 | (c.r.P & FLAG_C)
 	c.r.P = (c.r.P &^ FLAG_C) | (value >> 7)
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
 func ror(c *cpu, value byte) byte {
 	result := (value >> 1) | (c.r.P << 7)
 	c.r.P = (c.r.P &^ FLAG_C) | (value & FLAG_C)
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
@@ -424,7 +434,7 @@ func sbc_bin(c *cpu, value byte) byte {
 	if (c.r.A^result)&(value^result)&0x80 > 0 {
 		c.r.P |= FLAG_V
 	}
-	c.SetNZ(result)
+	c.setNZ(result)
 	return result
 }
 
@@ -466,7 +476,7 @@ func sbc_d(c *cpu, value byte) {
 		// fmt.Printf(" a=$%04X ($%02X)\n", a, byte(a))
 		c.r.A = byte(a)
 		c.t.Tick()
-		c.SetNZ(c.r.A)
+		c.setNZ(c.r.A)
 	default:
 		panic("Unknown chip version")
 	}
@@ -486,25 +496,25 @@ func sty(c *cpu) byte {
 
 func tax(c *cpu) {
 	c.r.X = c.r.A
-	c.SetNZ(c.r.X)
+	c.setNZ(c.r.X)
 	c.t.Tick()
 }
 
 func tay(c *cpu) {
 	c.r.Y = c.r.A
-	c.SetNZ(c.r.Y)
+	c.setNZ(c.r.Y)
 	c.t.Tick()
 }
 
 func tsx(c *cpu) {
 	c.r.X = c.r.SP
-	c.SetNZ(c.r.X)
+	c.setNZ(c.r.X)
 	c.t.Tick()
 }
 
 func txa(c *cpu) {
 	c.r.A = c.r.X
-	c.SetNZ(c.r.A)
+	c.setNZ(c.r.A)
 	c.t.Tick()
 }
 
@@ -515,6 +525,6 @@ func txs(c *cpu) {
 
 func tya(c *cpu) {
 	c.r.A = c.r.Y
-	c.SetNZ(c.r.A)
+	c.setNZ(c.r.A)
 	c.t.Tick()
 }

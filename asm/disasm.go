@@ -1,5 +1,5 @@
 /* 
-Package asm provides routines for decomiling 6502 assembly language.
+Package asm provides routines for decompiling 6502 assembly language.
 */
 package asm
 
