@@ -345,6 +345,7 @@ func pla(c *cpu) {
 	c.r.SP++
 	c.t.Tick()
 	c.r.A = c.m.Read(0x100 + uint16(c.r.SP))
+	c.setNZ(c.r.A)
 	c.t.Tick()
 }
 
