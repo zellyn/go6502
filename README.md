@@ -1,4 +1,4 @@
 go6502
 ======
 
-6502 Emulation Routines
+A 6502 emulator, written in Go.
