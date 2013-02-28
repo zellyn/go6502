@@ -50,9 +50,9 @@ func addrString(pc uint16, byte1, byte2 byte, length int, mode int) string {
 	case cpu.MODE_ZP_Y:
 		return fmt.Sprintf("$%02X,Y  ", byte1)
 	case cpu.MODE_INDIRECT_Y:
-		return fmt.Sprintf("($%02X,X)  ", byte1)
+		return fmt.Sprintf("($%02X),Y", byte1)
 	case cpu.MODE_INDIRECT_X:
-		return fmt.Sprintf("($%02X),Y  ", byte1)
+		return fmt.Sprintf("($%02X,X)", byte1)
 	case cpu.MODE_A:
 		return "       "
 	}
