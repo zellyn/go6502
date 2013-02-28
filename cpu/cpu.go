@@ -132,8 +132,8 @@ func (c *cpu) Step() error {
 	c.r.PC++
 	c.t.Tick()
 
-	if op, ok := Opcodes[i]; ok {
-		op.function(c)
+	if f, ok := Opcodes[i]; ok {
+		f(c)
 		return nil
 	}
 
