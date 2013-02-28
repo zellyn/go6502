@@ -2,8 +2,8 @@
 - Detailed per-instruction timing, etc: http://www.masswerk.at/6502/6502_instruction_set.html
 - aaabbbcc-type breakdown: http://www.llx.com/~nparker/a2/opcodes.html
 - 6502 Hardware manual (KIM-1): http://users.telenet.be/kim1-6502/6502/hwman.html#AA
-- Stack explanation (annoying writing): http://homepage.ntlworld.com/cyborgsystems/CS_Main/6502/6502.htm#STACK
 - For doublechecking cycle counts: http://www.obelisk.demon.co.uk/6502/reference.html
+- Stack explanation (annoying writing): http://homepage.ntlworld.com/cyborgsystems/CS_Main/6502/6502.htm#STACK
 
 * Reset sequences
 - http://www.pagetable.com/?p=410
