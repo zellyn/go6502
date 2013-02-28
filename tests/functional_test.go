@@ -6,6 +6,7 @@ package tests
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"testing"
 
 	"github.com/zellyn/go6502/asm"
@@ -29,6 +30,12 @@ func (c *CycleCount) Tick() {
 	*c += 1
 }
 
+func randomize(k *K64) {
+	for i := 0; i < 65536; i++ {
+		k[i] = byte(rand.Int())
+	}
+}
+
 // printStatus prints out the current CPU instruction and register status.
 func printStatus(c cpu.Cpu, m K64, cc CycleCount) {
 	bytes, text, _ := asm.Disasm(c.PC(), m[c.PC()], m[c.PC()+1], m[c.PC()+2])
@@ -38,11 +45,16 @@ func printStatus(c cpu.Cpu, m K64, cc CycleCount) {
 
 // Run Klaus Dormann's amazing comprehensive test.
 func TestFunctionalTest(t *testing.T) {
+	unused := map[byte]bool{}
+	for k, _ := range cpu.Opcodes {
+		unused[k] = true
+	}
 	bytes, err := ioutil.ReadFile("6502_functional_test.bin")
 	if err != nil {
 		panic("Cannot read file")
 	}
 	var m K64
+	randomize(&m)
 	var cc CycleCount
 	OFFSET := 0xa
 	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
@@ -50,6 +62,7 @@ func TestFunctionalTest(t *testing.T) {
 	c.Reset()
 	c.SetPC(0x1000)
 	for {
+		unused[m[c.PC()]] = false
 		oldPC := c.PC()
 		// printStatus(c, m, cc)
 		err := c.Step()
@@ -59,9 +72,14 @@ func TestFunctionalTest(t *testing.T) {
 		}
 		if c.PC() == oldPC {
 			if c.PC() != 0x3BB5 {
-				t.Errorf("Stuck at 0x%X: 0x%X\n", oldPC, m[oldPC])
+				t.Errorf("Stuck at $%04X: 0x%02X", oldPC, m[oldPC])
 			}
 			break
+		}
+	}
+	for k, v := range unused {
+		if v {
+			t.Errorf("Unused instruction: 0x%2X", k)
 		}
 	}
 }
@@ -73,6 +91,7 @@ func TestDecimalMode6502(t *testing.T) {
 		panic("Cannot read file")
 	}
 	var m K64
+	randomize(&m)
 	var cc CycleCount
 	OFFSET := 0x1000
 	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
@@ -108,6 +127,7 @@ func TestDecimalMode65C02(t *testing.T) {
 		panic("Cannot read file")
 	}
 	var m K64
+	randomize(&m)
 	var cc CycleCount
 	OFFSET := 0x1000
 	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
