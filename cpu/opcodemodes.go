@@ -8,6 +8,10 @@ package cpu
 // read twice on 65C02. See
 // http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks.
 
+// BUG(zellyn): Instructions should do many more reads. See
+// http://users.telenet.be/kim1-6502/6502/hwman.html#AA and/or table
+// 4.1 of "Understanding the Apple II".
+
 // immediate2 performs 2-opcode, 2-cycle immediate mode instructions.
 func immediate2(f func(*cpu, byte)) func(*cpu) {
 	return func(c *cpu) {
