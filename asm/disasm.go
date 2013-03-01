@@ -25,7 +25,7 @@ func bytesString(byte0, byte1, byte2 byte, length int) string {
 
 // addrString returns the address part of a 6502 assembly language
 // instruction.
-func addrString(pc uint16, byte1, byte2 byte, length int, mode int) string {
+func addrString(pc uint16, byte1, byte2 byte, length int, mode opcodes.AddressingMode) string {
 	addr16 := uint16(byte1) + uint16(byte2)<<8
 	addrRel := uint16(int32(pc+2) + int32(int8(byte1)))
 	switch mode {

@@ -11,8 +11,10 @@ import (
 )
 
 // Chip versions.
+type CpuVersion int
+
 const (
-	VERSION_6502 = iota
+	VERSION_6502 CpuVersion = iota
 	VERSION_65C02
 )
 
@@ -76,11 +78,11 @@ type cpu struct {
 	t       Ticker
 	r       registers
 	oldPC   uint16
-	version int
+	version CpuVersion
 }
 
 // Create and return a new Cpu object with the given memory, ticker, and of the given version.
-func NewCPU(memory Memory, ticker Ticker, version int) Cpu {
+func NewCPU(memory Memory, ticker Ticker, version CpuVersion) Cpu {
 	c := cpu{m: memory, t: ticker, version: version}
 	c.r.P |= FLAG_UNUSED // Set unused flag to 1
 	return &c

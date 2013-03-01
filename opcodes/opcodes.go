@@ -6,8 +6,10 @@ function tables.
 package opcodes
 
 // Opcode addressing modes.
+type AddressingMode int
+
 const (
-	MODE_IMPLIED = iota
+	MODE_IMPLIED AddressingMode = iota
 	MODE_ABSOLUTE
 	MODE_INDIRECT
 	MODE_RELATIVE
@@ -22,16 +24,20 @@ const (
 	MODE_A
 )
 
-// Opcode read/write semantics
+// Opcode read/write semantics: does the opcode read, write, or
+// rmw. Useful to distinguish between instructions further than just
+// addressing mode.
+type ReadWrite int
+
 const (
-	MEM_NONE = 0
-	MEM_R    = 1
-	MEM_W    = 2
-	MEM_RMW  = 3
+	RW_X   ReadWrite = 0 // Don't care
+	RW_R   ReadWrite = 1
+	RW_W   ReadWrite = 2
+	RW_RMW ReadWrite = 3
 )
 
 // Lengths of instructions for each addressing mode.
-var ModeLengths = map[int]int{
+var ModeLengths = map[AddressingMode]int{
 	MODE_IMPLIED:    1,
 	MODE_ABSOLUTE:   3,
 	MODE_INDIRECT:   3,
@@ -47,18 +53,11 @@ var ModeLengths = map[int]int{
 	MODE_A:          1,
 }
 
-const (
-	RW_X   = 0 // Don't care
-	RW_R   = 1
-	RW_W   = 2
-	RW_RMW = 3
-)
-
 // Opcode stores information about instructions.
 type Opcode struct {
 	Name string
-	Mode int
-	RW   int
+	Mode AddressingMode
+	RW   ReadWrite
 }
 
 // Fake NoOp instruction used when disassembling.
