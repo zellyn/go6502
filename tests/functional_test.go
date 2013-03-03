@@ -71,10 +71,10 @@ func TestFunctionalTest(t *testing.T) {
 			break
 		}
 		if c.PC() == oldPC {
-			if c.PC() != 0x3BB5 {
+			if c.PC() != 0x3CC5 {
 				t.Errorf("Stuck at $%04X: 0x%02X", oldPC, m[oldPC])
 			}
-			break
+			return
 		}
 	}
 	for k, v := range unused {

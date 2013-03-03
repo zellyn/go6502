@@ -21,7 +21,7 @@
 ; addressing modes with focus on propper setting of the processor status
 ; register bits.
 ; 
-; version 01-aug-2012
+; version 02-mar-2013
 ; contact info at http://2m5.de or email K@2m5.de
 ;
 ; assembled with AS65 from http://www.kingswood-consulting.co.uk/assemblers/
@@ -61,7 +61,8 @@
 ;                added license - GPLv3
 ;   30-jul-2012  added configuration options
 ;   01-aug-2012  added trap macro to allow user to change error handling
-
+;   01-dec-2012  fixed trap in branch field must be a branch
+;   02-mar-2013  fixed PLA flags not tested
 
 ; C O N F I G U R A T I O N
 ;
@@ -666,7 +667,7 @@ range_fw
         dex             ;-3
 range_op                ;test target with zero flag=0, z=1 if previous dex
 range_adr   = *+1       ;modifiable relative address
-        trap_eq         ;if called without modification
+        beq *+64        ;if called without modification
         dex             ;+0
         dex
         dex
@@ -861,10 +862,10 @@ test_bne
         cpx #$ff        ;sp incremented?
         trap_ne
         set_stat $ff    ;all on
-        trap_pl         ;branches should not be taken
-        trap_vc
-        trap_cc
-        trap_ne
+        bpl nbr1        ;branches should not be taken
+        bvc nbr2
+        bcc nbr3
+        bne nbr4
         bmi br1         ;branches should be taken
         trap 
 br1     bvs br2
@@ -873,6 +874,14 @@ br2     bcs br3
         trap 
 br3     beq br4
         trap 
+nbr1
+        trap            ;previous bpl taken 
+nbr2
+        trap            ;previous bvc taken
+nbr3
+        trap            ;previous bcc taken
+nbr4
+        trap            ;previous bne taken
 br4     php
         tsx
         cpx #$fe        ;sp after php?
@@ -884,7 +893,11 @@ br4     php
         cpx #$ff        ;sp after php?
         trap_ne
         set_stat 0      ;all off
-        trap_mi         ;branches should not be taken
+        bmi nbr11       ;branches should not be taken
+        bvs nbr12
+        bcs nbr13
+        beq nbr14
+        trap_mi  
         trap_vs
         trap_cs
         trap_eq 
@@ -896,6 +909,14 @@ br12    bcc br13
         trap 
 br13    bne br14
         trap 
+nbr11
+        trap            ;previous bmi taken 
+nbr12
+        trap            ;previous bvs taken 
+nbr13
+        trap            ;previous bcs taken 
+nbr14
+        trap            ;previous beq taken 
 br14    php
         pla
         cmp_flag 0      ;flags off except break (pushed by sw) + reserved?
@@ -918,6 +939,50 @@ br14    php
         set_stat $ff-minus
         trap_mi
 
+; test PHA does not alter flags or accumulator but PLA does
+        ldx #$55        ;x & y protected
+        ldy #$aa
+        set_a 1,$ff     ;push
+        pha
+        tst_a 1,$ff
+        set_a 0,0
+        pha
+        tst_a 0,0
+        set_a $ff,$ff
+        pha
+        tst_a $ff,$ff
+        set_a 1,0
+        pha
+        tst_a 1,0
+        set_a 0,$ff
+        pha
+        tst_a 0,$ff
+        set_a $ff,0
+        pha
+        tst_a $ff,0
+        set_a 0,$ff     ;pull
+        pla
+        tst_a $ff,$ff-zero
+        set_a $ff,0
+        pla
+        tst_a 0,zero
+        set_a $fe,$ff
+        pla
+        tst_a 1,$ff-zero-minus
+        set_a 0,0
+        pla
+        tst_a $ff,minus
+        set_a $ff,$ff
+        pla
+        tst_a 0,$ff-minus
+        set_a $fe,0
+        pla
+        tst_a 1,0
+        cpx #$55        ;x & y unchanged?
+        trap_ne
+        cpy #$aa
+        trap_ne
+ 
 ; partial pretest EOR #
         set_a $3c,0
         eor #$c3
