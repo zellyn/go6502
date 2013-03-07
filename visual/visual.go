@@ -1,0 +1,386 @@
+package visual
+
+import (
+	"fmt"
+
+	"github.com/zellyn/bitset"
+
+	icpu "github.com/zellyn/go6502/cpu"
+)
+
+type cpu struct {
+	m             icpu.Memory
+	cycle         uint64
+	nodeValues    *bitset.BitSet
+	nodePullups   *bitset.BitSet
+	nodePulldowns *bitset.BitSet
+
+	nodeGateCounts [NODES]uint            // the number of transistor gates attached to a node
+	nodeGates      [NODES][NODES]uint     // the list of transistor indexes attached to a node
+	nodeC1C2Counts [NODES]uint            // the number of transistor c1/c2s attached to a node
+	nodeC1C2s      [NODES][2 * NODES]uint // the list of transistor c1/c2s attached to a node
+
+	transistorValues *bitset.BitSet
+	transistorGates  [TRANSISTORS]uint
+	transistorC1s    [TRANSISTORS]uint
+	transistorC2s    [TRANSISTORS]uint
+
+	nodeDependantCounts [NODES]uint
+	nodeDependants      [NODES][NODES]uint // all C1 and C2 nodes of transistors attached to a node
+
+	listIn  []uint
+	listOut []uint
+
+	groupList             []uint
+	groupSet              *bitset.BitSet
+	groupContainsPullup   bool
+	groupContainsPulldown bool
+	groupContainsHi       bool
+}
+
+func NewCPU(memory icpu.Memory) icpu.Cpu {
+	c := cpu{m: memory}
+	c.setupNodesAndTransistors()
+	return &c
+}
+
+func (c *cpu) SetPC(uint16) {
+	panic("Not implemented")
+}
+
+// --------------------------------
+// Interfacing and extracting state
+// --------------------------------
+
+func (c *cpu) Read8(n0, n1, n2, n3, n4, n5, n6, n7 uint) byte {
+	return (c.nodeBit(n0) | c.nodeBit(n1)<<1 | c.nodeBit(n2)<<2 | c.nodeBit(n3)<<3 |
+		c.nodeBit(n4)<<4 | c.nodeBit(n5)<<5 | c.nodeBit(n6)<<6 | c.nodeBit(n7)<<7)
+}
+
+func (c *cpu) AddressBus() uint16 {
+	abl := uint16(c.Read8(NODE_ab0, NODE_ab1, NODE_ab2, NODE_ab3, NODE_ab4, NODE_ab5, NODE_ab6, NODE_ab7))
+	abh := uint16(c.Read8(NODE_ab8, NODE_ab9, NODE_ab10, NODE_ab11, NODE_ab12, NODE_ab13, NODE_ab14, NODE_ab15))
+	return abl + abh<<8
+}
+
+func (c *cpu) DataBus() byte {
+	return c.Read8(NODE_db0, NODE_db1, NODE_db2, NODE_db3, NODE_db4, NODE_db5, NODE_db6, NODE_db7)
+}
+
+func (c *cpu) A() byte {
+	return c.Read8(NODE_a0, NODE_a1, NODE_a2, NODE_a3, NODE_a4, NODE_a5, NODE_a6, NODE_a7)
+}
+
+func (c *cpu) X() byte {
+	return c.Read8(NODE_x0, NODE_x1, NODE_x2, NODE_x3, NODE_x4, NODE_x5, NODE_x6, NODE_x7)
+}
+
+func (c *cpu) Y() byte {
+	return c.Read8(NODE_y0, NODE_y1, NODE_y2, NODE_y3, NODE_y4, NODE_y5, NODE_y6, NODE_y7)
+}
+
+func (c *cpu) P() byte {
+	return c.Read8(NODE_p0, NODE_p1, NODE_p2, NODE_p3, NODE_p4, NODE_p5, NODE_p6, NODE_p7)
+}
+
+func (c *cpu) SP() byte {
+	return c.Read8(NODE_s0, NODE_s1, NODE_s2, NODE_s3, NODE_s4, NODE_s5, NODE_s6, NODE_s7)
+}
+
+func (c *cpu) IR() byte {
+	return c.Read8(NODE_notir0, NODE_notir1, NODE_notir2, NODE_notir3, NODE_notir4,
+		NODE_notir5, NODE_notir6, NODE_notir7) ^ 0xFF
+}
+
+func (c *cpu) PCL() byte {
+	return c.Read8(NODE_pcl0, NODE_pcl1, NODE_pcl2, NODE_pcl3, NODE_pcl4, NODE_pcl5, NODE_pcl6, NODE_pcl7)
+}
+
+func (c *cpu) PCH() byte {
+	return c.Read8(NODE_pch0, NODE_pch1, NODE_pch2, NODE_pch3, NODE_pch4, NODE_pch5, NODE_pch6, NODE_pch7)
+}
+
+func (c *cpu) PC() uint16 {
+	return uint16(c.PCH())<<8 + uint16(c.PCL())
+}
+
+func (c *cpu) nodeBit(n uint) byte {
+	if c.nodeValues.Test(n) {
+		return 1
+	}
+	return 0
+}
+
+func (c *cpu) writeDataBus(d byte) {
+	for i := 0; i < 8; i++ {
+		c.setNode(DataBusNodes[i], d&1 == 1)
+		d >>= 1
+	}
+}
+
+func (c *cpu) Reset() {
+	fmt.Println("Reset called")
+	// All nodes down
+	c.nodeValues.ClearAll()
+
+	// All transistors off
+	c.transistorValues.ClearAll()
+
+	c.setNode(NODE_res, false)
+	c.setNode(NODE_clk0, true)
+	c.setNode(NODE_rdy, true)
+	c.setNode(NODE_so, false)
+	c.setNode(NODE_irq, true)
+	c.setNode(NODE_nmi, true)
+
+	c.recalcAllNodes()
+
+	// Hold RESET for 8 cycles
+	for i := 0; i < 8; i++ {
+		fmt.Println("Reset step ", i)
+		c.Step()
+	}
+
+	c.setNode(NODE_res, true)
+
+	c.cycle = 0
+}
+
+func (c *cpu) switchLists() {
+	c.listIn, c.listOut = c.listOut, c.listIn
+}
+
+func (c *cpu) addNodeToGroup(n uint) {
+	if c.groupSet.Test(n) {
+		return
+	}
+
+	c.groupSet.Set(n)
+	c.groupList = append(c.groupList, n)
+
+	if c.nodePullups.Test(n) {
+		c.groupContainsPullup = true
+	}
+	if c.nodePulldowns.Test(n) {
+		c.groupContainsPulldown = true
+	}
+	if c.nodeValues.Test(n) {
+		c.groupContainsHi = true
+	}
+
+	if n == NODE_vss || n == NODE_vcc {
+		return
+	}
+
+	/* revisit all transistors that are controlled by this node */
+	for t := uint(0); t < c.nodeC1C2Counts[n]; t++ {
+		tn := c.nodeC1C2s[n][t]
+		if c.transistorValues.Test(tn) {
+			if c.transistorC1s[tn] == n {
+				c.addNodeToGroup(c.transistorC2s[tn])
+			} else {
+				c.addNodeToGroup(c.transistorC1s[tn])
+			}
+		}
+	}
+}
+
+func (c *cpu) addAllNodesToGroup(node uint) {
+	c.groupList = c.groupList[0:0]
+	c.groupSet.ClearAll()
+	c.groupContainsPullup = false
+	c.groupContainsPulldown = false
+	c.groupContainsHi = false
+
+	c.addNodeToGroup(node)
+}
+
+func (c *cpu) getGroupValue() bool {
+	if c.groupSet.Test(NODE_vss) {
+		return false
+	}
+	if c.groupSet.Test(NODE_vcc) {
+		return true
+	}
+	if c.groupContainsPulldown {
+		return false
+	}
+	if c.groupContainsPullup {
+		return true
+	}
+	return c.groupContainsHi
+}
+
+func (c *cpu) recalcNode(node uint) {
+	/*
+	 * get all nodes that are connected through
+	 * transistors, starting with this one
+	 */
+	c.addAllNodesToGroup(node)
+
+	/* get the state of the group */
+	newv := c.getGroupValue()
+
+	/*
+	 * - set all nodes to the group state
+	 * - check all transistors switched by nodes of the group
+	 * - collect all nodes behind toggled transistors
+	 *   for the next run
+	 */
+	for _, nn := range c.groupList {
+		if c.nodeValues.Test(nn) != newv {
+			c.nodeValues.SetTo(nn, newv)
+			for t := uint(0); t < c.nodeGateCounts[nn]; t++ {
+				tn := c.nodeGates[nn][t]
+				c.transistorValues.Flip(tn)
+			}
+			c.listOut = append(c.listOut, nn)
+		}
+	}
+}
+
+func (c *cpu) recalcNodeList(nodes []uint) {
+	c.listOut = c.listOut[0:0]
+
+	for _, n := range nodes {
+		c.recalcNode(n)
+	}
+
+	c.switchLists()
+
+	for j := 0; j < 100; j++ { /* loop limiter */
+		if len(c.listIn) == 0 {
+			break
+		}
+		c.listOut = c.listOut[0:0]
+
+		/*
+		 * for all nodes, follow their paths through
+		 * turned-on transistors, find the state of the
+		 * path and assign it to all nodes, and re-evaluate
+		 * all transistors controlled by this path, collecting
+		 * all nodes that changed because of it for the next run
+		 */
+		for _, n := range c.listIn {
+			for g := uint(0); g < c.nodeDependantCounts[n]; g++ {
+				c.recalcNode(c.nodeDependants[n][g])
+			}
+		}
+		/*
+		 * make the secondary list our primary list, use
+		 * the data storage of the primary list as the
+		 * secondary list
+		 */
+		c.switchLists()
+	}
+}
+
+func (c *cpu) recalcAllNodes() {
+	temp := make([]uint, NODES)
+	for i := uint(0); i < NODES; i++ {
+		temp[i] = i
+	}
+	c.recalcNodeList(temp)
+}
+
+/**************/
+/* Node State */
+/**************/
+
+func (c *cpu) setNode(nn uint, state bool) {
+	c.nodePullups.SetTo(nn, state)
+	c.nodePulldowns.SetTo(nn, !state)
+	c.recalcNodeList([]uint{nn})
+}
+
+func (c *cpu) isNodeHigh(n uint) bool {
+	return c.nodeValues.Test(n)
+}
+
+// handleMemory is called when clk0 is low, and either reads from or
+// writes to memory, depending on rw.
+func (c *cpu) handleMemory() {
+	if c.isNodeHigh(NODE_rw) {
+		c.writeDataBus(c.m.Read(c.AddressBus()))
+	} else {
+		c.m.Write(c.AddressBus(), c.DataBus())
+	}
+}
+
+// HalfStep is the main clock loop, and takes a half clock step.
+func (c *cpu) HalfStep() {
+	clk := c.isNodeHigh(NODE_clk0)
+	c.setNode(NODE_clk0, !clk)
+
+	if !clk {
+		c.handleMemory()
+	}
+	c.cycle++
+}
+
+// Step takes two half steps.
+func (c *cpu) Step() error {
+	c.HalfStep()
+	c.HalfStep()
+	return nil
+}
+
+/******************/
+/* Initialization */
+/******************/
+
+func (c *cpu) addNodeDependant(a, b uint) {
+	for g := uint(0); g < c.nodeDependantCounts[a]; g++ {
+		if c.nodeDependants[a][g] == b {
+			return
+		}
+	}
+	c.nodeDependants[a][c.nodeDependantCounts[a]] = b
+	c.nodeDependantCounts[a]++
+}
+
+func (c *cpu) setupNodesAndTransistors() {
+
+	// Zero out bitsets
+	c.nodeValues = bitset.New(NODES)
+	c.nodePullups = bitset.New(NODES)
+	c.nodePulldowns = bitset.New(NODES)
+	c.transistorValues = bitset.New(TRANSISTORS)
+	c.groupSet = bitset.New(NODES)
+	c.groupList = make([]uint, 0, NODES)
+
+	// Copy node data from SegDefs into r/w data structures
+	for i := uint(0); i < NODES; i++ {
+		c.nodePullups.SetTo(i, SegDefs[i])
+		c.nodeGateCounts[i] = 0
+		c.nodeC1C2Counts[i] = 0
+	}
+
+	// Copy transistor data from TransDefs into r/w data structures
+	for i, t := range TransDefs {
+		c.transistorGates[i] = t.gate
+		c.transistorC1s[i] = t.c1
+		c.transistorC2s[i] = t.c2
+	}
+
+	// Cross-reference transistors in nodes data structures
+	for j, t := range TransDefs {
+		i := uint(j)
+		c.nodeGates[t.gate][c.nodeGateCounts[t.gate]] = i
+		c.nodeGateCounts[t.gate]++
+
+		c.nodeC1C2s[t.c1][c.nodeC1C2Counts[t.c1]] = i
+		c.nodeC1C2Counts[t.c1]++
+		c.nodeC1C2s[t.c2][c.nodeC1C2Counts[t.c2]] = i
+		c.nodeC1C2Counts[t.c2]++
+	}
+
+	for i := uint(0); i < NODES; i++ {
+		c.nodeDependantCounts[i] = 0
+		for g := uint(0); g < c.nodeGateCounts[i]; g++ {
+			t := c.nodeGates[i][g]
+			c.addNodeDependant(i, c.transistorC1s[t])
+			c.addNodeDependant(i, c.transistorC2s[t])
+		}
+	}
+}
