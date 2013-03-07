@@ -21,4 +21,8 @@ _testmain.go
 
 *.exe
 
+# Mac junk
+.DS_Store
+
 harness/harness
+
