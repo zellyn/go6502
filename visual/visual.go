@@ -1,8 +1,6 @@
 package visual
 
 import (
-	"github.com/willf/bitset"
-
 	icpu "github.com/zellyn/go6502/cpu" // Just need the interface
 )
 
@@ -16,9 +14,6 @@ type cpu struct {
 	nodeC1C2s      [NODES][2 * NODES]uint // the list of transistor c1/c2s attached to a node
 
 	transistorValues []bool
-	transistorGates  [TRANSISTORS]uint
-	transistorC1s    [TRANSISTORS]uint
-	transistorC2s    [TRANSISTORS]uint
 
 	nodeDependantCounts [NODES]uint
 	nodeDependants      [NODES][NODES]uint // all C1 and C2 nodes of transistors attached to a node
@@ -26,9 +21,9 @@ type cpu struct {
 	listIn  []uint
 	listOut []uint
 
-	groupList  []uint
-	groupSet   *bitset.BitSet
-	groupValue byte
+	groupList  []uint               // list of node group membership
+	groupSet   [NODES/32 + 1]uint32 // quick check for node group membership
+	groupValue byte                 // presence of vss/vcc/pulldown/pullup/hi in group
 }
 
 // Bitfield for node values.
@@ -191,11 +186,13 @@ func (c *cpu) switchLists() {
 }
 
 func (c *cpu) addNodeToGroup(n uint) {
-	if c.groupSet.Test(n) {
+	index := n >> 5
+	mask := uint32(1 << (n & 0x1f))
+	if c.groupSet[index]&mask > 0 {
 		return
 	}
 
-	c.groupSet.Set(n)
+	c.groupSet[index] |= mask
 	c.groupList = append(c.groupList, n)
 
 	c.groupValue |= c.nodeValues[n]
@@ -207,10 +204,10 @@ func (c *cpu) addNodeToGroup(n uint) {
 	for t := uint(0); t < c.nodeC1C2Counts[n]; t++ {
 		tn := c.nodeC1C2s[n][t]
 		if c.transistorValues[tn] {
-			if c.transistorC1s[tn] == n {
-				c.addNodeToGroup(c.transistorC2s[tn])
+			if TransDefs[tn].c1 == n {
+				c.addNodeToGroup(TransDefs[tn].c2)
 			} else {
-				c.addNodeToGroup(c.transistorC1s[tn])
+				c.addNodeToGroup(TransDefs[tn].c1)
 			}
 		}
 	}
@@ -219,7 +216,6 @@ func (c *cpu) addNodeToGroup(n uint) {
 func (c *cpu) addAllNodesToGroup(node uint) {
 	c.groupList = c.groupList[0:0]
 	c.groupValue = 0
-	c.groupSet.ClearAll()
 
 	c.addNodeToGroup(node)
 }
@@ -241,6 +237,7 @@ func (c *cpu) recalcNode(node uint) {
 	 *   for the next run
 	 */
 	for _, nn := range c.groupList {
+		c.groupSet[nn>>5] = 0 // Clear as we go
 		if c.nodeValues[nn]&VAL_HI != newv {
 			c.nodeValues[nn] ^= VAL_HI
 			for t := uint(0); t < c.nodeGateCounts[nn]; t++ {
@@ -370,7 +367,6 @@ func (c *cpu) setupNodesAndTransistors() {
 
 	// Zero out bitsets
 	c.transistorValues = make([]bool, TRANSISTORS)
-	c.groupSet = bitset.New(NODES)
 	c.groupList = make([]uint, 0, NODES)
 	c.nodeValues = make([]byte, NODES)
 
@@ -390,13 +386,6 @@ func (c *cpu) setupNodesAndTransistors() {
 		}
 	}
 
-	// Copy transistor data from TransDefs into r/w data structures
-	for i, t := range TransDefs {
-		c.transistorGates[i] = t.gate
-		c.transistorC1s[i] = t.c1
-		c.transistorC2s[i] = t.c2
-	}
-
 	// Cross-reference transistors in nodes data structures
 	for j, t := range TransDefs {
 		i := uint(j)
@@ -413,8 +402,8 @@ func (c *cpu) setupNodesAndTransistors() {
 		c.nodeDependantCounts[i] = 0
 		for g := uint(0); g < c.nodeGateCounts[i]; g++ {
 			t := c.nodeGates[i][g]
-			c.addNodeDependant(i, c.transistorC1s[t])
-			c.addNodeDependant(i, c.transistorC2s[t])
+			c.addNodeDependant(i, TransDefs[t].c1)
+			c.addNodeDependant(i, TransDefs[t].c2)
 		}
 	}
 }

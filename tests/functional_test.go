@@ -76,7 +76,6 @@ func TestFunctionalTestInstructions(t *testing.T) {
 			if c.PC() != 0x3CC5 {
 				t.Errorf("Stuck at $%04X: 0x%02X", oldPC, m[oldPC])
 			}
-			fmt.Println(cc, "ticks")
 			return
 		}
 	}
