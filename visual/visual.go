@@ -1,26 +1,21 @@
 package visual
 
 import (
-	"fmt"
+	"github.com/willf/bitset"
 
-	"github.com/zellyn/bitset"
-
-	icpu "github.com/zellyn/go6502/cpu"
+	icpu "github.com/zellyn/go6502/cpu" // Just need the interface
 )
 
 type cpu struct {
-	m             icpu.Memory
-	cycle         uint64
-	nodeValues    *bitset.BitSet
-	nodePullups   *bitset.BitSet
-	nodePulldowns *bitset.BitSet
-
+	m              icpu.Memory
+	cycle          uint64
+	nodeValues     []byte                 // Bitmask of node values (see const VAL_* below)
 	nodeGateCounts [NODES]uint            // the number of transistor gates attached to a node
 	nodeGates      [NODES][NODES]uint     // the list of transistor indexes attached to a node
 	nodeC1C2Counts [NODES]uint            // the number of transistor c1/c2s attached to a node
 	nodeC1C2s      [NODES][2 * NODES]uint // the list of transistor c1/c2s attached to a node
 
-	transistorValues *bitset.BitSet
+	transistorValues []bool
 	transistorGates  [TRANSISTORS]uint
 	transistorC1s    [TRANSISTORS]uint
 	transistorC2s    [TRANSISTORS]uint
@@ -31,11 +26,55 @@ type cpu struct {
 	listIn  []uint
 	listOut []uint
 
-	groupList             []uint
-	groupSet              *bitset.BitSet
-	groupContainsPullup   bool
-	groupContainsPulldown bool
-	groupContainsHi       bool
+	groupList  []uint
+	groupSet   *bitset.BitSet
+	groupValue byte
+}
+
+// Bitfield for node values.
+const (
+	VAL_HI = 1 << iota // We count on this being bit 0, so we can mask it out for 0 or 1.
+	VAL_PULLUP
+	VAL_PULLDOWN
+	VAL_VCC
+	VAL_VSS
+)
+
+// The lookup table for the group value. If vss is in the group, it's 0, vcc makes it 1, etc.
+// vss, vcc, pulldown, pullup, hi
+var GroupValues = [32]byte{
+	0, // 00000 - nothing
+	1, // 00001 - contains at least one hi node
+	1, // 00010 - contains at least one pullup
+	1, // 00011 - contains at least one pullup
+	0, // 00100 - contains at least one pulldown
+	0, // 00101 - contains at least one pulldown
+	0, // 00110 - contains at least one pulldown
+	0, // 00111 - contains at least one pulldown
+	1, // 01000 - contains vcc
+	1, // 01001 - contains vcc
+	1, // 01010 - contains vcc
+	1, // 01011 - contains vcc
+	1, // 01100 - contains vcc
+	1, // 01101 - contains vcc
+	1, // 01110 - contains vcc
+	1, // 01111 - contains vcc
+	0, // 10000- contains vss
+	0, // 10001- contains vss
+	0, // 10010- contains vss
+	0, // 10011- contains vss
+	0, // 10100- contains vss
+	0, // 10101- contains vss
+	0, // 10110- contains vss
+	0, // 10111- contains vss
+	0, // 11000- contains vss
+	0, // 11001- contains vss
+	0, // 11010- contains vss
+	0, // 11011- contains vss
+	0, // 11100- contains vss
+	0, // 11101- contains vss
+	0, // 11110- contains vss
+	0, // 11111- contains vss
 }
 
 func NewCPU(memory icpu.Memory) icpu.Cpu {
@@ -44,6 +83,7 @@ func NewCPU(memory icpu.Memory) icpu.Cpu {
 	return &c
 }
 
+// Needed for the interface. Not really practical. I guess we could try changing the nodes directly.
 func (c *cpu) SetPC(uint16) {
 	panic("Not implemented")
 }
@@ -105,10 +145,7 @@ func (c *cpu) PC() uint16 {
 }
 
 func (c *cpu) nodeBit(n uint) byte {
-	if c.nodeValues.Test(n) {
-		return 1
-	}
-	return 0
+	return c.nodeValues[n] & VAL_HI // 1
 }
 
 func (c *cpu) writeDataBus(d byte) {
@@ -119,12 +156,16 @@ func (c *cpu) writeDataBus(d byte) {
 }
 
 func (c *cpu) Reset() {
-	fmt.Println("Reset called")
 	// All nodes down
-	c.nodeValues.ClearAll()
+	for i := range c.nodeValues {
+		c.nodeValues[i] &^= VAL_HI
+	}
 
 	// All transistors off
-	c.transistorValues.ClearAll()
+
+	for i := range c.transistorValues {
+		c.transistorValues[i] = false
+	}
 
 	c.setNode(NODE_res, false)
 	c.setNode(NODE_clk0, true)
@@ -137,7 +178,6 @@ func (c *cpu) Reset() {
 
 	// Hold RESET for 8 cycles
 	for i := 0; i < 8; i++ {
-		fmt.Println("Reset step ", i)
 		c.Step()
 	}
 
@@ -158,16 +198,7 @@ func (c *cpu) addNodeToGroup(n uint) {
 	c.groupSet.Set(n)
 	c.groupList = append(c.groupList, n)
 
-	if c.nodePullups.Test(n) {
-		c.groupContainsPullup = true
-	}
-	if c.nodePulldowns.Test(n) {
-		c.groupContainsPulldown = true
-	}
-	if c.nodeValues.Test(n) {
-		c.groupContainsHi = true
-	}
-
+	c.groupValue |= c.nodeValues[n]
 	if n == NODE_vss || n == NODE_vcc {
 		return
 	}
@@ -175,7 +206,7 @@ func (c *cpu) addNodeToGroup(n uint) {
 	/* revisit all transistors that are controlled by this node */
 	for t := uint(0); t < c.nodeC1C2Counts[n]; t++ {
 		tn := c.nodeC1C2s[n][t]
-		if c.transistorValues.Test(tn) {
+		if c.transistorValues[tn] {
 			if c.transistorC1s[tn] == n {
 				c.addNodeToGroup(c.transistorC2s[tn])
 			} else {
@@ -187,28 +218,10 @@ func (c *cpu) addNodeToGroup(n uint) {
 
 func (c *cpu) addAllNodesToGroup(node uint) {
 	c.groupList = c.groupList[0:0]
+	c.groupValue = 0
 	c.groupSet.ClearAll()
-	c.groupContainsPullup = false
-	c.groupContainsPulldown = false
-	c.groupContainsHi = false
 
 	c.addNodeToGroup(node)
-}
-
-func (c *cpu) getGroupValue() bool {
-	if c.groupSet.Test(NODE_vss) {
-		return false
-	}
-	if c.groupSet.Test(NODE_vcc) {
-		return true
-	}
-	if c.groupContainsPulldown {
-		return false
-	}
-	if c.groupContainsPullup {
-		return true
-	}
-	return c.groupContainsHi
 }
 
 func (c *cpu) recalcNode(node uint) {
@@ -219,7 +232,7 @@ func (c *cpu) recalcNode(node uint) {
 	c.addAllNodesToGroup(node)
 
 	/* get the state of the group */
-	newv := c.getGroupValue()
+	newv := GroupValues[c.groupValue]
 
 	/*
 	 * - set all nodes to the group state
@@ -228,11 +241,11 @@ func (c *cpu) recalcNode(node uint) {
 	 *   for the next run
 	 */
 	for _, nn := range c.groupList {
-		if c.nodeValues.Test(nn) != newv {
-			c.nodeValues.SetTo(nn, newv)
+		if c.nodeValues[nn]&VAL_HI != newv {
+			c.nodeValues[nn] ^= VAL_HI
 			for t := uint(0); t < c.nodeGateCounts[nn]; t++ {
 				tn := c.nodeGates[nn][t]
-				c.transistorValues.Flip(tn)
+				c.transistorValues[tn] = !c.transistorValues[tn]
 			}
 			c.listOut = append(c.listOut, nn)
 		}
@@ -287,14 +300,28 @@ func (c *cpu) recalcAllNodes() {
 /* Node State */
 /**************/
 
+// So we don't have to keep re-allocating
+var oneNode = []uint{0}
+
 func (c *cpu) setNode(nn uint, state bool) {
-	c.nodePullups.SetTo(nn, state)
-	c.nodePulldowns.SetTo(nn, !state)
-	c.recalcNodeList([]uint{nn})
+	oldState := c.nodeValues[nn]
+	newState := oldState
+	if state {
+		newState &^= VAL_PULLDOWN
+		newState |= VAL_PULLUP
+	} else {
+		newState &^= VAL_PULLUP
+		newState |= VAL_PULLDOWN
+	}
+	if newState != oldState {
+		c.nodeValues[nn] = newState
+		oneNode[0] = nn
+		c.recalcNodeList(oneNode)
+	}
 }
 
 func (c *cpu) isNodeHigh(n uint) bool {
-	return c.nodeValues.Test(n)
+	return c.nodeValues[n]&VAL_HI > 0
 }
 
 // handleMemory is called when clk0 is low, and either reads from or
@@ -342,18 +369,25 @@ func (c *cpu) addNodeDependant(a, b uint) {
 func (c *cpu) setupNodesAndTransistors() {
 
 	// Zero out bitsets
-	c.nodeValues = bitset.New(NODES)
-	c.nodePullups = bitset.New(NODES)
-	c.nodePulldowns = bitset.New(NODES)
-	c.transistorValues = bitset.New(TRANSISTORS)
+	c.transistorValues = make([]bool, TRANSISTORS)
 	c.groupSet = bitset.New(NODES)
 	c.groupList = make([]uint, 0, NODES)
+	c.nodeValues = make([]byte, NODES)
 
 	// Copy node data from SegDefs into r/w data structures
 	for i := uint(0); i < NODES; i++ {
-		c.nodePullups.SetTo(i, SegDefs[i])
 		c.nodeGateCounts[i] = 0
 		c.nodeC1C2Counts[i] = 0
+
+		if SegDefs[i] {
+			c.nodeValues[i] = VAL_PULLUP
+		}
+		if i == NODE_vss {
+			c.nodeValues[i] |= VAL_VSS
+		}
+		if i == NODE_vcc {
+			c.nodeValues[i] |= VAL_VCC
+		}
 	}
 
 	// Copy transistor data from TransDefs into r/w data structures

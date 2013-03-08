@@ -11,6 +11,7 @@ import (
 
 	"github.com/zellyn/go6502/asm"
 	"github.com/zellyn/go6502/cpu"
+	"github.com/zellyn/go6502/visual"
 )
 
 // Memory for the tests. Satisfies the cpu.Memory interface.
@@ -37,14 +38,15 @@ func randomize(k *K64) {
 }
 
 // printStatus prints out the current CPU instruction and register status.
-func printStatus(c cpu.Cpu, m K64, cc CycleCount) {
+func printStatus(c cpu.Cpu, m K64) {
 	bytes, text, _ := asm.Disasm(c.PC(), m[c.PC()], m[c.PC()+1], m[c.PC()+2])
-	fmt.Printf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b - %d\n",
-		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P(), cc)
+	fmt.Printf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b\n",
+		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P())
 }
 
-// Run Klaus Dormann's amazing comprehensive test.
-func TestFunctionalTest(t *testing.T) {
+// Run Klaus Dormann's amazing comprehensive test against the
+// instruction-level CPU emulation.
+func TestFunctionalTestInstructions(t *testing.T) {
 	unused := map[byte]bool{}
 	for k, _ := range cpu.Opcodes {
 		unused[k] = true
@@ -74,6 +76,7 @@ func TestFunctionalTest(t *testing.T) {
 			if c.PC() != 0x3CC5 {
 				t.Errorf("Stuck at $%04X: 0x%02X", oldPC, m[oldPC])
 			}
+			fmt.Println(cc, "ticks")
 			return
 		}
 	}
@@ -81,6 +84,58 @@ func TestFunctionalTest(t *testing.T) {
 		if v {
 			t.Errorf("Unused instruction: 0x%2X", k)
 		}
+	}
+}
+
+// Run the first few thousand steps of Klaus Dormann's amazing
+// comprehensive test against the gate-level CPU emulation.
+func TestFunctionalTestGates(t *testing.T) {
+	expected := []uint16{
+		0,
+		4327,
+		4288,
+		4253,
+		4221,
+		4194,
+		4171,
+		4152,
+		4137,
+		4105,
+		4374,
+		4368,
+	}
+	bytes, err := ioutil.ReadFile("6502_functional_test.bin")
+	if err != nil {
+		panic("Cannot read file")
+	}
+	var m K64
+	randomize(&m)
+	OFFSET := 0xa
+	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
+	// Set the RESET vector to jump to the tests
+	m[0xFFFC] = 0x00
+	m[0xFFFD] = 0x10
+	c := visual.NewCPU(&m)
+	c.Reset()
+	count := uint64(0)
+	for {
+		count++
+		if count%1000 == 0 {
+			pc := c.PC()
+			if pc == 0x3CC5 {
+				return
+			}
+			if count/1000 < uint64(len(expected)) {
+				expectedPC := expected[count/1000]
+				if pc != expectedPC {
+					t.Errorf("Expected PC=%d at step %d, got %d", expectedPC, count, pc)
+				}
+			} else {
+				return
+			}
+		}
+		// printStatus(c, m)
+		c.Step()
 	}
 }
 
