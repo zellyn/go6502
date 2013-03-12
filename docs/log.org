@@ -1,0 +1,38 @@
+* 2013-02 - Building a 6502 emulator
+
+1. Download the latest copy of Klaus Dormann's amazing 6502 functional tests.
+- Easy-to-look-at (old) version: https://github.com/redline6561/cl-6502/blob/master/tests/6502_functional_test.a65
+- Announcement and discussion on 6502.org: http://forum.6502.org/viewtopic.php?f=2&t=2241
+- Source: http://2m5.de/6502_Emu/index.htm
+
+2. Figure out how to compile them using as65
+- Download: http://www.kingswood-consulting.co.uk/assemblers/
+- If you're on Mac OS, running Ubuntu in a VirtualBox with a shared folder might be the easiest way.
+
+3. Create a skeleton CPU, memory interface, etc. and write a loop that loads and interprets instructions.
+- No need to implement any instructions yet: just make it fail on unknown instructions.
+- Also, make it exit if it gets stuck on the same instruction, since that's how Klaus' tests signal errors.
+- Except for when that's how the test signals success: better notice
+  that special address. (Look at the assembler listing output.)
+
+4. Run it on the tests. When you hit a failure or unimplemented opcode, write code until it works.
+Here are some references:
+- Detailed per-instruction timing, etc: http://www.masswerk.at/6502/6502_instruction_set.html
+- aaabbbcc-type breakdown: http://www.llx.com/~nparker/a2/opcodes.html
+- 6502 Hardware manual (KIM-1): http://users.telenet.be/kim1-6502/6502/hwman.html#AA
+- For doublechecking cycle counts: http://www.obelisk.demon.co.uk/6502/reference.html
+- Stack explanation (annoying writing): http://homepage.ntlworld.com/cyborgsystems/CS_Main/6502/6502.htm#STACK
+
+5. Some things will creep through. eg. https://github.com/zellyn/go6502/commit/a0cb814c9ed8eedfd558627be24934af6c257d32
+You'll find them later. :-)
+
+* 2013-02-27 - Tracking down "PP" instead of PRINT in Applesoft Basic
+Finally tracked it down to PLA of non-zero value not clearing the Z flag.
+Applesoft: D75D is a BNE that should always be taken, since GETCHR (D72C) does PLA of non-zero value.
+- Invaluable: Applesoft commented disassembly: http://www.txbobsc.com/scsc/scdocumentor/
+* 2013-03-07 - Speeding up visual.go
+Sped things up so that they take less than half as long as they did
+before. Replaced bitset.BitSet with direct array bitset to avoid
+checking for extensions, and to allow clearing by uint32.
+* Discrepancies
+My ZP,x and ZP,y were doing 16-bit adds, able to go outside the zero page.
