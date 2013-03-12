@@ -37,18 +37,18 @@ func randomize(k *K64) {
 	}
 }
 
-// printStatus prints out the current CPU instruction and register status.
-func printStatus(c cpu.Cpu, m K64) {
+// status prints out the current CPU instruction and register status.
+func status(c cpu.Cpu, m *[65536]byte, cc uint64) string {
 	bytes, text, _ := asm.Disasm(c.PC(), m[c.PC()], m[c.PC()+1], m[c.PC()+2])
-	fmt.Printf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b\n",
-		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P())
+	return fmt.Sprintf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b - %d\n",
+		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P(), cc)
 }
 
 // Run Klaus Dormann's amazing comprehensive test against the
 // instruction-level CPU emulation.
 func TestFunctionalTestInstructions(t *testing.T) {
 	unused := map[byte]bool{}
-	for k, _ := range cpu.Opcodes {
+	for k := range cpu.Opcodes {
 		unused[k] = true
 	}
 	bytes, err := ioutil.ReadFile("6502_functional_test.bin")
@@ -66,7 +66,7 @@ func TestFunctionalTestInstructions(t *testing.T) {
 	for {
 		unused[m[c.PC()]] = false
 		oldPC := c.PC()
-		// printStatus(c, m, cc)
+		// status(c, m, cc)
 		err := c.Step()
 		if err != nil {
 			t.Error(err)
@@ -133,7 +133,7 @@ func TestFunctionalTestGates(t *testing.T) {
 				return
 			}
 		}
-		// printStatus(c, m)
+		// status(c, m, cc)
 		c.Step()
 	}
 }
@@ -155,7 +155,7 @@ func TestDecimalMode6502(t *testing.T) {
 	c.SetPC(0x1000)
 	for {
 		oldPC := c.PC()
-		// printStatus(c, m, cc)
+		// status(c, m, cc)
 		err := c.Step()
 		if err != nil {
 			t.Error(err)
@@ -191,7 +191,7 @@ func TestDecimalMode65C02(t *testing.T) {
 	c.SetPC(0x1000)
 	for {
 		oldPC := c.PC()
-		// printStatus(c, m, cc)
+		// status(c, m, cc)
 		err := c.Step()
 		if err != nil {
 			t.Error(err)
