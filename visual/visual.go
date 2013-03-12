@@ -5,18 +5,15 @@ import (
 )
 
 type cpu struct {
-	m              icpu.Memory
-	cycle          uint64
-	nodeValues     []byte                 // Bitmask of node values (see const VAL_* below)
-	nodeGateCounts [NODES]uint            // the number of transistor gates attached to a node
-	nodeGates      [NODES][NODES]uint     // the list of transistor indexes attached to a node
-	nodeC1C2Counts [NODES]uint            // the number of transistor c1/c2s attached to a node
-	nodeC1C2s      [NODES][2 * NODES]uint // the list of transistor c1/c2s attached to a node
+	m          icpu.Memory
+	cycle      uint64
+	nodeValues []byte   // Bitmask of node values (see const VAL_* below)
+	nodeGates  [][]uint // the list of transistor indexes attached to a node
+	nodeC1C2s  [][]uint // the list of transistor c1/c2s attached to a node
 
 	transistorValues []bool
 
-	nodeDependantCounts [NODES]uint
-	nodeDependants      [NODES][NODES]uint // all C1 and C2 nodes of transistors attached to a node
+	nodeDependants [][]uint // all C1 and C2 nodes of transistors attached to a node
 
 	listIn  []uint
 	listOut []uint
@@ -201,8 +198,7 @@ func (c *cpu) addNodeToGroup(n uint) {
 	}
 
 	/* revisit all transistors that are controlled by this node */
-	for t := uint(0); t < c.nodeC1C2Counts[n]; t++ {
-		tn := c.nodeC1C2s[n][t]
+	for _, tn := range c.nodeC1C2s[n] {
 		if c.transistorValues[tn] {
 			if TransDefs[tn].c1 == n {
 				c.addNodeToGroup(TransDefs[tn].c2)
@@ -240,8 +236,7 @@ func (c *cpu) recalcNode(node uint) {
 		c.groupSet[nn>>5] = 0 // Clear as we go
 		if c.nodeValues[nn]&VAL_HI != newv {
 			c.nodeValues[nn] ^= VAL_HI
-			for t := uint(0); t < c.nodeGateCounts[nn]; t++ {
-				tn := c.nodeGates[nn][t]
+			for _, tn := range c.nodeGates[nn] {
 				c.transistorValues[tn] = !c.transistorValues[tn]
 			}
 			c.listOut = append(c.listOut, nn)
@@ -272,8 +267,8 @@ func (c *cpu) recalcNodeList(nodes []uint) {
 		 * all nodes that changed because of it for the next run
 		 */
 		for _, n := range c.listIn {
-			for g := uint(0); g < c.nodeDependantCounts[n]; g++ {
-				c.recalcNode(c.nodeDependants[n][g])
+			for _, d := range c.nodeDependants[n] {
+				c.recalcNode(d)
 			}
 		}
 		/*
@@ -354,13 +349,12 @@ func (c *cpu) Step() error {
 /******************/
 
 func (c *cpu) addNodeDependant(a, b uint) {
-	for g := uint(0); g < c.nodeDependantCounts[a]; g++ {
-		if c.nodeDependants[a][g] == b {
+	for _, d := range c.nodeDependants[a] {
+		if b == d {
 			return
 		}
 	}
-	c.nodeDependants[a][c.nodeDependantCounts[a]] = b
-	c.nodeDependantCounts[a]++
+	c.nodeDependants[a] = append(c.nodeDependants[a], b)
 }
 
 func (c *cpu) setupNodesAndTransistors() {
@@ -369,12 +363,12 @@ func (c *cpu) setupNodesAndTransistors() {
 	c.transistorValues = make([]bool, TRANSISTORS)
 	c.groupList = make([]uint, 0, NODES)
 	c.nodeValues = make([]byte, NODES)
+	c.nodeGates = make([][]uint, NODES)
+	c.nodeC1C2s = make([][]uint, NODES)
+	c.nodeDependants = make([][]uint, NODES)
 
 	// Copy node data from SegDefs into r/w data structures
 	for i := uint(0); i < NODES; i++ {
-		c.nodeGateCounts[i] = 0
-		c.nodeC1C2Counts[i] = 0
-
 		if SegDefs[i] {
 			c.nodeValues[i] = VAL_PULLUP
 		}
@@ -389,19 +383,13 @@ func (c *cpu) setupNodesAndTransistors() {
 	// Cross-reference transistors in nodes data structures
 	for j, t := range TransDefs {
 		i := uint(j)
-		c.nodeGates[t.gate][c.nodeGateCounts[t.gate]] = i
-		c.nodeGateCounts[t.gate]++
-
-		c.nodeC1C2s[t.c1][c.nodeC1C2Counts[t.c1]] = i
-		c.nodeC1C2Counts[t.c1]++
-		c.nodeC1C2s[t.c2][c.nodeC1C2Counts[t.c2]] = i
-		c.nodeC1C2Counts[t.c2]++
+		c.nodeGates[t.gate] = append(c.nodeGates[t.gate], i)
+		c.nodeC1C2s[t.c1] = append(c.nodeC1C2s[t.c1], i)
+		c.nodeC1C2s[t.c2] = append(c.nodeC1C2s[t.c2], i)
 	}
 
 	for i := uint(0); i < NODES; i++ {
-		c.nodeDependantCounts[i] = 0
-		for g := uint(0); g < c.nodeGateCounts[i]; g++ {
-			t := c.nodeGates[i][g]
+		for _, t := range c.nodeGates[i] {
 			c.addNodeDependant(i, TransDefs[t].c1)
 			c.addNodeDependant(i, TransDefs[t].c2)
 		}
