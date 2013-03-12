@@ -5,15 +5,14 @@ import (
 )
 
 type cpu struct {
-	m          icpu.Memory
-	cycle      uint64
-	nodeValues []byte   // Bitmask of node values (see const VAL_* below)
-	nodeGates  [][]uint // the list of transistor indexes attached to a node
-	nodeC1C2s  [][]uint // the list of transistor c1/c2s attached to a node
+	m              icpu.Memory
+	cycle          uint64
+	nodeValues     []byte   // Bitmask of node values (see const VAL_* below)
+	nodeGates      [][]uint // the list of transistor indexes attached to a node
+	nodeC1C2s      [][]uint // the list of transistor c1/c2s attached to a node
+	nodeDependants [][]uint // all C1 and C2 nodes of transistors attached to a node
 
 	transistorValues []bool
-
-	nodeDependants [][]uint // all C1 and C2 nodes of transistors attached to a node
 
 	listIn  []uint
 	listOut []uint
