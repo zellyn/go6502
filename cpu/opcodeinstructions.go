@@ -15,7 +15,7 @@ func (c *cpu) setNZ(value byte) {
 // samePage is a helper that returns true if two memory addresses
 // refer to the same page.
 func samePage(a1 uint16, a2 uint16) bool {
-	return a1^a2&0xFF00 == 0
+	return (a1^a2)&0xFF00 == 0
 }
 
 // clearFlag builds instructions that clear the flag specified by the
@@ -23,6 +23,7 @@ func samePage(a1 uint16, a2 uint16) bool {
 func clearFlag(flag byte) func(*cpu) {
 	return func(c *cpu) {
 		c.r.P &^= flag
+		c.m.Read(c.r.PC)
 		c.t.Tick()
 	}
 }
@@ -32,6 +33,7 @@ func clearFlag(flag byte) func(*cpu) {
 func setFlag(flag byte) func(*cpu) {
 	return func(c *cpu) {
 		c.r.P |= flag
+		c.m.Read(c.r.PC)
 		c.t.Tick()
 	}
 }
@@ -40,17 +42,22 @@ func setFlag(flag byte) func(*cpu) {
 // register masks to a given value.
 func branch(mask, value byte) func(*cpu) {
 	return func(c *cpu) {
+		// T1
 		offset := c.m.Read(c.r.PC)
 		c.r.PC++
 		c.t.Tick()
+		// T2
 		oldPC := c.r.PC
 		if c.r.P&mask == value {
+			c.m.Read(oldPC)
 			c.t.Tick()
+			// T3
 			c.r.PC = c.r.PC + uint16(offset)
 			if offset >= 128 {
 				c.r.PC = c.r.PC - 256
 			}
 			if !samePage(c.r.PC, oldPC) {
+				c.m.Read((oldPC & 0xFF00) | (c.r.PC & 0x00FF))
 				c.t.Tick()
 			}
 		}
@@ -146,6 +153,7 @@ func bit(c *cpu, value byte) {
 // http://en.wikipedia.org/wiki/Interrupts_in_65xx_processors#Using_BRK_and_COP
 func brk(c *cpu) {
 	// T1
+	c.m.Read(c.r.PC)
 	c.r.PC++
 	c.t.Tick()
 	// T2
@@ -206,12 +214,14 @@ func dec(c *cpu, value byte) byte {
 func dex(c *cpu) {
 	c.r.X--
 	c.setNZ(c.r.X)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func dey(c *cpu) {
 	c.r.Y--
 	c.setNZ(c.r.Y)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
@@ -229,12 +239,14 @@ func inc(c *cpu, value byte) byte {
 func inx(c *cpu) {
 	c.r.X++
 	c.setNZ(c.r.X)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func iny(c *cpu) {
 	c.r.Y++
 	c.setNZ(c.r.Y)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
@@ -287,13 +299,14 @@ func jsr(c *cpu) {
 	c.r.PC++
 	c.t.Tick()
 	// T2
+	c.m.Read(0x100 + uint16(c.r.SP)) // Ignored read on stack
 	c.t.Tick()
 	// T3
-	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC>>8))
+	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC>>8)) // Write PC|hi to stack
 	c.r.SP--
 	c.t.Tick()
 	// T4
-	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC&0xff))
+	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC&0xff)) // Write PC|lo to stack
 	c.r.SP--
 	c.t.Tick()
 	// T5
@@ -330,10 +343,12 @@ func ora(c *cpu, value byte) {
 }
 
 func nop(c *cpu) {
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func pha(c *cpu) {
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 	c.m.Write(0x100+uint16(c.r.SP), c.r.A)
 	c.r.SP--
@@ -341,7 +356,9 @@ func pha(c *cpu) {
 }
 
 func pla(c *cpu) {
+	c.m.Read(c.r.PC)
 	c.t.Tick()
+	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
 	c.t.Tick()
 	c.r.A = c.m.Read(0x100 + uint16(c.r.SP))
@@ -350,13 +367,17 @@ func pla(c *cpu) {
 }
 
 func php(c *cpu) {
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 	c.m.Write(0x100+uint16(c.r.SP), c.r.P)
 	c.r.SP--
 	c.t.Tick()
 }
+
 func plp(c *cpu) {
+	c.m.Read(c.r.PC)
 	c.t.Tick()
+	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
 	c.t.Tick()
 	c.r.P = c.m.Read(0x100+uint16(c.r.SP)) | FLAG_UNUSED | FLAG_B
@@ -379,8 +400,10 @@ func ror(c *cpu, value byte) byte {
 
 func rts(c *cpu) {
 	// T1
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 	// T2
+	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
 	c.t.Tick()
 	// T3
@@ -391,14 +414,17 @@ func rts(c *cpu) {
 	addr |= (uint16(c.m.Read(0x100+uint16(c.r.SP))) << 8)
 	c.t.Tick()
 	// T5
+	c.m.Read(addr)
 	c.r.PC = addr + 1 // Since we pushed PC(next) - 1
 	c.t.Tick()
 }
 
 func rti(c *cpu) {
 	// T1
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 	// T2
+	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
 	c.t.Tick()
 	// T3
@@ -498,34 +524,40 @@ func sty(c *cpu) byte {
 func tax(c *cpu) {
 	c.r.X = c.r.A
 	c.setNZ(c.r.X)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func tay(c *cpu) {
 	c.r.Y = c.r.A
 	c.setNZ(c.r.Y)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func tsx(c *cpu) {
 	c.r.X = c.r.SP
 	c.setNZ(c.r.X)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func txa(c *cpu) {
 	c.r.A = c.r.X
 	c.setNZ(c.r.A)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func txs(c *cpu) {
 	c.r.SP = c.r.X
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
 
 func tya(c *cpu) {
 	c.r.A = c.r.Y
 	c.setNZ(c.r.A)
+	c.m.Read(c.r.PC)
 	c.t.Tick()
 }
