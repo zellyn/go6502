@@ -5,84 +5,12 @@ Tests for the 6502 CPU emulator, comparing it with the transistor-level simulati
 package tests
 
 import (
-	"fmt"
 	"io/ioutil"
 	"testing"
 
 	"github.com/zellyn/go6502/cpu"
 	"github.com/zellyn/go6502/visual"
 )
-
-type memOp struct {
-	read    bool
-	address uint16
-	data    byte
-}
-
-func (op memOp) String() string {
-	rw := "W"
-	if op.read {
-		rw = "R"
-	}
-	return fmt.Sprintf("{%s $%04X: %02X}", rw, op.address, op.data)
-}
-
-// Memory for the tests. Satisfies the cpu.Memory interface.
-type memorizer struct {
-	mem1   [65536]byte
-	mem2   [65536]byte
-	ops    []memOp
-	verify bool
-	errors []string
-}
-
-func (m *memorizer) Reset() {
-	m.verify = false
-	m.errors = m.errors[:0]
-	m.ops = m.ops[:0]
-}
-
-func (m *memorizer) Record() {
-	m.verify = false
-}
-
-func (m *memorizer) Verify() {
-	m.verify = true
-}
-
-func (m *memorizer) checkOp(newOp memOp) {
-	oldOp := m.ops[0]
-	m.ops = m.ops[1:]
-	if oldOp != newOp {
-		// fmt.Println(newOp, "expected:", oldOp)
-		m.errors = append(m.errors, fmt.Sprintf("Bad op: %v, expected %v", newOp, oldOp))
-	} else {
-		// fmt.Println(newOp)
-	}
-}
-
-func (m *memorizer) Read(address uint16) byte {
-	if !m.verify { // recording
-		data := m.mem1[address]
-		newOp := memOp{true, address, data}
-		m.ops = append(m.ops, newOp)
-		return data
-	}
-	data := m.mem2[address]
-	m.checkOp(memOp{true, address, data})
-	return data
-}
-
-func (m *memorizer) Write(address uint16, value byte) {
-	newOp := memOp{false, address, value}
-	if !m.verify { // recording
-		m.ops = append(m.ops, newOp)
-		m.mem1[address] = value
-		return
-	}
-	m.checkOp(newOp)
-	m.mem2[address] = value
-}
 
 // Run the first few thousand steps of Klaus Dormann's comprehensive
 // test against the instruction- and gate-level CPU emulations, making
@@ -106,7 +34,7 @@ func TestFunctionalTestCompare(t *testing.T) {
 	if err != nil {
 		panic("Cannot read file")
 	}
-	var m memorizer
+	var m Memorizer
 	OFFSET := 0xa
 	copy(m.mem1[OFFSET:len(bytes)+OFFSET], bytes)
 	copy(m.mem2[OFFSET:len(bytes)+OFFSET], bytes)
@@ -126,7 +54,7 @@ func TestFunctionalTestCompare(t *testing.T) {
 	c := cpu.NewCPU(&m, &cc, cpu.VERSION_6502)
 	c.Reset()
 
-	m.Reset()
+	m.Reset(MODE_RECORD)
 	v.Step()
 	v.Step()
 	m.Verify()

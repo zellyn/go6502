@@ -2,3 +2,4 @@
 - Keep group state in a single mask, and index into a precomputed array of groupvalues.
 - Don't use a bitmap for transistor values.
 - Don't recompute in SetNode if nothing changed.
+- Clear out the group membership bitmask as we go (one whole uint32 at a time)
