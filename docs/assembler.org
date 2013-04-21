@@ -1,0 +1,8 @@
+$C030 - hex number
+
+Line - Label - Opcode - Operand - Comments
+    1000 TONE    LDA $C030
+    1010 LOOP    DEY
+    1020         BNE LOOP
+    1030         JMP TONE
+

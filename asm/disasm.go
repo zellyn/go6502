@@ -5,6 +5,7 @@ package asm
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/zellyn/go6502/opcodes"
 )
@@ -72,4 +73,24 @@ func Disasm(pc uint16, byte0, byte1, byte2 byte) (string, string, int) {
 	bytes := bytesString(byte0, byte1, byte2, length)
 	addr := addrString(pc, byte1, byte2, length, op.Mode)
 	return bytes, op.Name + " " + addr, length
+}
+
+// DisasmBlock disassembles an entire block, writing out the disassembly.
+func DisasmBlock(block []byte, startAddr uint16, w io.Writer) {
+	l := len(block)
+	for i := 0; i < l; i++ {
+		byte0 := block[i]
+		byte1 := byte(0xFF)
+		byte2 := byte(0xFF)
+		if i+1 < l {
+			byte1 = block[i+1]
+		}
+		if i+2 < l {
+			byte2 = block[i+2]
+		}
+		addr := uint16(i) + startAddr
+		bytes, op, length := Disasm(addr, byte0, byte1, byte2)
+		fmt.Fprintf(w, "$%04X: %s %s\n", addr, bytes, op)
+		i += length - 1
+	}
 }
