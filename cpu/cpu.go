@@ -8,6 +8,8 @@ package cpu
 
 import (
 	"fmt"
+
+	"github.com/zellyn/go6502/asm"
 )
 
 // Chip versions.
@@ -30,6 +32,7 @@ type Cpu interface {
 	P() byte // [NV-BDIZC]
 	SP() byte
 	// BUG(zellyn): Add signaling of interrupts.
+	Print(bool)
 }
 
 // Memory interface, for all memory access.
@@ -79,12 +82,13 @@ type cpu struct {
 	r       registers
 	oldPC   uint16
 	version CpuVersion
+	print   bool
 }
 
 // Create and return a new Cpu object with the given memory, ticker, and of the given version.
 func NewCPU(memory Memory, ticker Ticker, version CpuVersion) Cpu {
 	c := cpu{m: memory, t: ticker, version: version}
-	c.r.P |= FLAG_UNUSED // Set unused flag to 1
+	c.r.P |= FLAG_UNUSED | FLAG_B // Set unused flag to 1
 	return &c
 }
 
@@ -127,8 +131,18 @@ func (c *cpu) Reset() {
 	}
 }
 
+// status prints out the current CPU instruction and register status.
+func status(c *cpu, m Memory) string {
+	bytes, text, _ := asm.Disasm(c.PC(), m.Read(c.PC()), m.Read(c.PC()+1), m.Read(c.PC()+2))
+	return fmt.Sprintf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b",
+		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P())
+}
+
 // Step takes a single step (which will last several cycles, calling Tick() on the Ticker for each).
 func (c *cpu) Step() error {
+	if c.print {
+		fmt.Println(status(c, c.m))
+	}
 	c.oldPC = c.r.PC
 	i := c.m.Read(c.r.PC)
 	c.r.PC++
@@ -145,4 +159,8 @@ func (c *cpu) Step() error {
 // Set the program counter.
 func (c *cpu) SetPC(address uint16) {
 	c.r.PC = address
+}
+
+func (c *cpu) Print(print bool) {
+	c.print = print
 }

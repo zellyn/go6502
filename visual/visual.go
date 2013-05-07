@@ -394,3 +394,7 @@ func (c *cpu) setupNodesAndTransistors() {
 		}
 	}
 }
+
+func (c *cpu) Print(bool) {
+	panic("not implemented")
+}
