@@ -1,0 +1,3 @@
+* TODO only figure out what the opcode *looks* like in the assembler: more DRY
+* TODO implement byte value check in simple instruction test
+* TODO add line/character reporting to parse errors

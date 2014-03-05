@@ -19,7 +19,7 @@ func immediate2(f func(*cpu, byte)) func(*cpu) {
 		value := c.m.Read(c.r.PC)
 		c.r.PC++
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -29,15 +29,15 @@ func absolute4r(f func(*cpu, byte)) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		value := c.m.Read(addr)
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -47,14 +47,14 @@ func absolute4w(f func(*cpu) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Write(addr, f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -64,11 +64,11 @@ func zp3r(f func(*cpu, byte)) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		value := c.m.Read(addr)
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -78,10 +78,10 @@ func zp3w(f func(*cpu) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Write(addr, f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -91,21 +91,21 @@ func absx4r(f func(*cpu, byte)) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		addrX := addr + uint16(c.r.X)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		if !samePage(addr, addrX) {
 			c.m.Read(addrX - 0x100)
-			c.t.Tick()
+			c.t()
 		}
 		// T3(cotd.) or T4
 		value := c.m.Read(addrX)
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -115,21 +115,21 @@ func absy4r(f func(*cpu, byte)) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		addrY := addr + uint16(c.r.Y)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		if !samePage(addr, addrY) {
 			c.m.Read(addrY - 0x100)
-			c.t.Tick()
+			c.t()
 		}
 		// T3(cotd.) or T4
 		value := c.m.Read(addrY)
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -139,18 +139,18 @@ func absx5w(f func(*cpu) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		addrX := addr + uint16(c.r.X)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Read((addr & 0xFF00) | (addrX & 0x00FF))
-		c.t.Tick()
+		c.t()
 		// T4
 		c.m.Write(addrX, f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -160,18 +160,18 @@ func absy5w(f func(*cpu) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		addrY := addr + uint16(c.r.Y)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Read((addr & 0xFF00) | (addrY & 0x00FF))
-		c.t.Tick()
+		c.t()
 		// T4
 		c.m.Write(addrY, f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -182,14 +182,14 @@ func zpx4r(f func(*cpu, byte)) func(*cpu) {
 		addr := c.m.Read(c.r.PC)
 		addrX := uint16(addr + c.r.X)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(addr))
-		c.t.Tick()
+		c.t()
 		// T3
 		value := c.m.Read(addrX)
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -200,13 +200,13 @@ func zpx4w(f func(*cpu) byte) func(*cpu) {
 		addr := c.m.Read(c.r.PC)
 		addrX := uint16(addr + c.r.X)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(addr))
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Write(uint16(addrX), f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -217,14 +217,14 @@ func zpy4r(f func(*cpu, byte)) func(*cpu) {
 		addr := c.m.Read(c.r.PC)
 		addrY := uint16(addr + c.r.Y)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(addr))
-		c.t.Tick()
+		c.t()
 		// T3
 		value := c.m.Read(uint16(addrY))
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -235,13 +235,13 @@ func zpy4w(f func(*cpu) byte) func(*cpu) {
 		addr := c.m.Read(c.r.PC)
 		addrY := uint16(addr + c.r.Y)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(addr))
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Write(addrY, f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -251,23 +251,23 @@ func zpiy5r(f func(*cpu, byte)) func(*cpu) {
 		// T1
 		iAddr := c.m.Read(c.r.PC)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr := uint16(c.m.Read(uint16(iAddr)))
-		c.t.Tick()
+		c.t()
 		// T3
 		addr |= (uint16(c.m.Read(uint16(iAddr+1))) << 8)
 		addrY := addr + uint16(c.r.Y)
-		c.t.Tick()
+		c.t()
 		// T4
 		if !samePage(addr, addrY) {
 			c.m.Read((addr & 0xFF00) | (addrY & 0x00FF))
-			c.t.Tick()
+			c.t()
 		}
 		// T4(cotd.) or T5
 		value := c.m.Read(addr + uint16(c.r.Y))
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -277,20 +277,20 @@ func zpiy6w(f func(*cpu) byte) func(*cpu) {
 		// T1
 		iAddr := c.m.Read(c.r.PC)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr := uint16(uint16(c.m.Read(uint16(iAddr))))
-		c.t.Tick()
+		c.t()
 		// T3
 		addr |= (uint16(c.m.Read(uint16(iAddr+1))) << 8)
 		addrY := addr + uint16(c.r.Y)
-		c.t.Tick()
+		c.t()
 		// T4
 		c.m.Read((addr & 0xFF00) | (addrY & 0x00FF))
-		c.t.Tick()
+		c.t()
 		// T5
 		c.m.Write(addr+uint16(c.r.Y), f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -300,20 +300,20 @@ func zpxi6r(f func(*cpu, byte)) func(*cpu) {
 		// T1
 		iAddr := c.m.Read(c.r.PC)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(iAddr))
-		c.t.Tick()
+		c.t()
 		// T3
 		addr := uint16(uint16(c.m.Read(uint16(iAddr + c.r.X))))
-		c.t.Tick()
+		c.t()
 		// T4
 		addr |= (uint16(c.m.Read(uint16(iAddr+c.r.X+1))) << 8)
-		c.t.Tick()
+		c.t()
 		// T5
 		value := c.m.Read(addr)
 		f(c, value)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -323,19 +323,19 @@ func zpxi6w(f func(*cpu) byte) func(*cpu) {
 		// T1
 		iAddr := c.m.Read(c.r.PC)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(iAddr))
-		c.t.Tick()
+		c.t()
 		// T3
 		addr := uint16(uint16(c.m.Read(uint16(iAddr + c.r.X))))
-		c.t.Tick()
+		c.t()
 		// T4
 		addr |= (uint16(c.m.Read(uint16(iAddr+c.r.X+1))) << 8)
-		c.t.Tick()
+		c.t()
 		// T5
 		c.m.Write(addr, f(c))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -345,7 +345,7 @@ func acc2rmw(f func(*cpu, byte) byte) func(*cpu) {
 		// T1
 		c.m.Read(c.r.PC)
 		c.r.A = f(c, c.r.A)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -355,16 +355,16 @@ func zp5rmw(f func(*cpu, byte) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		value := c.m.Read(addr)
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Write(addr, value)
-		c.t.Tick()
+		c.t()
 		// T4
 		c.m.Write(addr, f(c, value))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -374,20 +374,20 @@ func abs6rmw(f func(*cpu, byte) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		value := c.m.Read(addr)
-		c.t.Tick()
+		c.t()
 		// T4
 		c.m.Write(addr, value) // Spurious write...
-		c.t.Tick()
+		c.t()
 		// T5
 		c.m.Write(addr, f(c, value))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -397,20 +397,20 @@ func zpx6rmw(f func(*cpu, byte) byte) func(*cpu) {
 		// T1
 		addr8 := c.m.Read(c.r.PC)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		c.m.Read(uint16(addr8))
-		c.t.Tick()
+		c.t()
 		// T3
 		addr := uint16(addr8 + c.r.X)
 		value := c.m.Read(addr)
-		c.t.Tick()
+		c.t()
 		// T4
 		c.m.Write(addr, value)
-		c.t.Tick()
+		c.t()
 		// T5
 		c.m.Write(addr, f(c, value))
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -420,23 +420,23 @@ func absx7rmw(f func(*cpu, byte) byte) func(*cpu) {
 		// T1
 		addr := uint16(c.m.Read(c.r.PC))
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 		addr += uint16(c.r.X)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T3
 		c.m.Read(addr)
-		c.t.Tick()
+		c.t()
 		// T4
 		value := c.m.Read(addr)
-		c.t.Tick()
+		c.t()
 		// T5
 		c.m.Write(addr, value) // Spurious write
-		c.t.Tick()
+		c.t()
 		// T6
 		c.m.Write(addr, f(c, value))
-		c.t.Tick()
+		c.t()
 	}
 }

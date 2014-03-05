@@ -24,7 +24,7 @@ func clearFlag(flag byte) func(*cpu) {
 	return func(c *cpu) {
 		c.r.P &^= flag
 		c.m.Read(c.r.PC)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -34,7 +34,7 @@ func setFlag(flag byte) func(*cpu) {
 	return func(c *cpu) {
 		c.r.P |= flag
 		c.m.Read(c.r.PC)
-		c.t.Tick()
+		c.t()
 	}
 }
 
@@ -45,12 +45,12 @@ func branch(mask, value byte) func(*cpu) {
 		// T1
 		offset := c.m.Read(c.r.PC)
 		c.r.PC++
-		c.t.Tick()
+		c.t()
 		// T2
 		oldPC := c.r.PC
 		if c.r.P&mask == value {
 			c.m.Read(oldPC)
-			c.t.Tick()
+			c.t()
 			// T3
 			c.r.PC = c.r.PC + uint16(offset)
 			if offset >= 128 {
@@ -58,7 +58,7 @@ func branch(mask, value byte) func(*cpu) {
 			}
 			if !samePage(c.r.PC, oldPC) {
 				c.m.Read((oldPC & 0xFF00) | (c.r.PC & 0x00FF))
-				c.t.Tick()
+				c.t()
 			}
 		}
 	}
@@ -121,7 +121,7 @@ func adc_d(c *cpu, value byte) {
 			c.r.P |= FLAG_Z
 		}
 	case VERSION_65C02:
-		c.t.Tick()
+		c.t()
 		c.setNZ(byte(a & 0xFF))
 	default:
 		panic("Unknown chip version")
@@ -155,27 +155,27 @@ func brk(c *cpu) {
 	// T1
 	c.m.Read(c.r.PC)
 	c.r.PC++
-	c.t.Tick()
+	c.t()
 	// T2
 	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC>>8))
 	c.r.SP--
-	c.t.Tick()
+	c.t()
 	// T3
 	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC&0xff))
 	c.r.SP--
-	c.t.Tick()
+	c.t()
 	// T4
 	c.m.Write(0x100+uint16(c.r.SP), c.r.P|FLAG_B) // Set B flag
 	c.r.SP--
 	c.r.P |= FLAG_I // Disable interrupts
-	c.t.Tick()
+	c.t()
 	// T5
 	addr := uint16(c.m.Read(IRQ_VECTOR))
-	c.t.Tick()
+	c.t()
 	// T6
 	addr |= (uint16(c.m.Read(IRQ_VECTOR+1)) << 8)
 	c.r.PC = addr
-	c.t.Tick()
+	c.t()
 }
 
 func cmp(c *cpu, value byte) {
@@ -215,14 +215,14 @@ func dex(c *cpu) {
 	c.r.X--
 	c.setNZ(c.r.X)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func dey(c *cpu) {
 	c.r.Y--
 	c.setNZ(c.r.Y)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func eor(c *cpu, value byte) {
@@ -240,40 +240,40 @@ func inx(c *cpu) {
 	c.r.X++
 	c.setNZ(c.r.X)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func iny(c *cpu) {
 	c.r.Y++
 	c.setNZ(c.r.Y)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func jmpAbsolute(c *cpu) {
 	// T1
 	addr := uint16(c.m.Read(c.r.PC))
 	c.r.PC++
-	c.t.Tick()
+	c.t()
 	// T2
 	addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 	c.r.PC++
 	c.r.PC = addr
-	c.t.Tick()
+	c.t()
 }
 
 func jmpIndirect(c *cpu) {
 	// T1
 	iAddr := uint16(c.m.Read(c.r.PC))
 	c.r.PC++
-	c.t.Tick()
+	c.t()
 	// T2
 	iAddr |= (uint16(c.m.Read(c.r.PC)) << 8)
 	c.r.PC++
-	c.t.Tick()
+	c.t()
 	// T3
 	addr := uint16(c.m.Read(iAddr))
-	c.t.Tick()
+	c.t()
 	// T4
 	// 6502 jumps to (xxFF,xx00) instead of (xxFF,xxFF+1).
 	// See http://en.wikipedia.org/wiki/MOS_Technology_6502#Bugs_and_quirks
@@ -290,29 +290,29 @@ func jmpIndirect(c *cpu) {
 		panic("Unknown chip version")
 	}
 	c.r.PC = addr
-	c.t.Tick()
+	c.t()
 }
 
 func jsr(c *cpu) {
 	// T1
 	addr := uint16(c.m.Read(c.r.PC)) // We actually push PC(next) - 1
 	c.r.PC++
-	c.t.Tick()
+	c.t()
 	// T2
 	c.m.Read(0x100 + uint16(c.r.SP)) // Ignored read on stack
-	c.t.Tick()
+	c.t()
 	// T3
 	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC>>8)) // Write PC|hi to stack
 	c.r.SP--
-	c.t.Tick()
+	c.t()
 	// T4
 	c.m.Write(0x100+uint16(c.r.SP), byte(c.r.PC&0xff)) // Write PC|lo to stack
 	c.r.SP--
-	c.t.Tick()
+	c.t()
 	// T5
 	addr |= (uint16(c.m.Read(c.r.PC)) << 8)
 	c.r.PC = addr
-	c.t.Tick()
+	c.t()
 }
 
 func lda(c *cpu, value byte) {
@@ -344,44 +344,44 @@ func ora(c *cpu, value byte) {
 
 func nop(c *cpu) {
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func pha(c *cpu) {
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 	c.m.Write(0x100+uint16(c.r.SP), c.r.A)
 	c.r.SP--
-	c.t.Tick()
+	c.t()
 }
 
 func pla(c *cpu) {
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
-	c.t.Tick()
+	c.t()
 	c.r.A = c.m.Read(0x100 + uint16(c.r.SP))
 	c.setNZ(c.r.A)
-	c.t.Tick()
+	c.t()
 }
 
 func php(c *cpu) {
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 	c.m.Write(0x100+uint16(c.r.SP), c.r.P)
 	c.r.SP--
-	c.t.Tick()
+	c.t()
 }
 
 func plp(c *cpu) {
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
-	c.t.Tick()
+	c.t()
 	c.r.P = c.m.Read(0x100+uint16(c.r.SP)) | FLAG_UNUSED | FLAG_B
-	c.t.Tick()
+	c.t()
 }
 
 func rol(c *cpu, value byte) byte {
@@ -401,43 +401,43 @@ func ror(c *cpu, value byte) byte {
 func rts(c *cpu) {
 	// T1
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 	// T2
 	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
-	c.t.Tick()
+	c.t()
 	// T3
 	addr := uint16(c.m.Read(0x100 + uint16(c.r.SP)))
 	c.r.SP++
-	c.t.Tick()
+	c.t()
 	// T4
 	addr |= (uint16(c.m.Read(0x100+uint16(c.r.SP))) << 8)
-	c.t.Tick()
+	c.t()
 	// T5
 	c.m.Read(addr)
 	c.r.PC = addr + 1 // Since we pushed PC(next) - 1
-	c.t.Tick()
+	c.t()
 }
 
 func rti(c *cpu) {
 	// T1
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 	// T2
 	c.m.Read(0x100 + uint16(c.r.SP))
 	c.r.SP++
-	c.t.Tick()
+	c.t()
 	// T3
 	c.r.P = c.m.Read(0x100+uint16(c.r.SP)) | FLAG_UNUSED
 	c.r.SP++
 	// T4
 	addr := uint16(c.m.Read(0x100 + uint16(c.r.SP)))
 	c.r.SP++
-	c.t.Tick()
+	c.t()
 	// T5
 	addr |= (uint16(c.m.Read(0x100+uint16(c.r.SP))) << 8)
 	c.r.PC = addr
-	c.t.Tick()
+	c.t()
 }
 
 func sbc(c *cpu, value byte) {
@@ -502,7 +502,7 @@ func sbc_d(c *cpu, value byte) {
 		}
 		// fmt.Printf(" a=$%04X ($%02X)\n", a, byte(a))
 		c.r.A = byte(a)
-		c.t.Tick()
+		c.t()
 		c.setNZ(c.r.A)
 	default:
 		panic("Unknown chip version")
@@ -525,39 +525,39 @@ func tax(c *cpu) {
 	c.r.X = c.r.A
 	c.setNZ(c.r.X)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func tay(c *cpu) {
 	c.r.Y = c.r.A
 	c.setNZ(c.r.Y)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func tsx(c *cpu) {
 	c.r.X = c.r.SP
 	c.setNZ(c.r.X)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func txa(c *cpu) {
 	c.r.A = c.r.X
 	c.setNZ(c.r.A)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func txs(c *cpu) {
 	c.r.SP = c.r.X
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }
 
 func tya(c *cpu) {
 	c.r.A = c.r.Y
 	c.setNZ(c.r.A)
 	c.m.Read(c.r.PC)
-	c.t.Tick()
+	c.t()
 }

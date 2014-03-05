@@ -1,0 +1,63 @@
+
+
+| Concept                       | SCSC             | AS65             | Merlin |
+|-------------------------------+------------------+------------------+--------|
+| origin                        | .OR              | org              |        |
+|                               |                  |                  |        |
+| target address                | .TA              |                  |        |
+|                               |                  |                  |        |
+| include                       | .IN              |                  |        |
+|                               |                  |                  |        |
+| comment                       | *                | ;                |        |
+|                               | >1 space         |                  |        |
+|                               |                  |                  |        |
+| label                         | at left          |                  |        |
+|                               |                  |                  |        |
+| equ                           | .EQ              | =                |        |
+|                               |                  | equ              |        |
+|                               |                  |                  |        |
+| binary                        |                  | %00000001        |        |
+|                               |                  |                  |        |
+| macro                         | .MA macro_name   | macro_name macro |        |
+|                               | .EM              | endm             |        |
+|                               |                  |                  |        |
+| if                            | .DO              | if foo = 1       |        |
+|                               | .ELSE            | endif            |        |
+|                               | [.ELSE] (toggle) |                  |        |
+|                               | .FIN             |                  |        |
+| data                          |                  |                  |        |
+| - word (LE)                   | .DA expr         |                  |        |
+| - byte (LSB)                  | .DA #expr        |                  |        |
+| - byte (MSB)                  | .DA /expr        |                  |        |
+|                               |                  |                  |        |
+| ascii string                  |                  |                  |        |
+| - normal use                  | .AS "foo"        |                  |        |
+| - arb. delimeter              | .AS dfood        |                  |        |
+| - high bit set                | .AS -"foo"       |                  |        |
+| - last high bit opposite      | .AT "foo"        |                  |        |
+|                               |                  |                  |        |
+| hex string                    | .HS              |                  |        |
+|                               |                  |                  |        |
+| reserve space (block storage) | .BS <bytes>      |                  |        |
+|                               |                  |                  |        |
+
+Things to ignore
+| Concept | SCSC                   | AS65 |
+|---------+------------------------+------|
+| title   | .TI <lines/page>,title |      |
+| file    | .TF filename           |      |
+  
+
+
+* AS65 notes
+https://github.com/Klaus2m5/6502_65C02_functional_tests/blob/master/6502_functional_test.a65
+
+
+* SCSC notes
+
+    .DO -- Conditional Assembly                 5-9
+    .ELSE -- Conditional Assembly               5-9
+    .FIN -- Conditional Assembly                5-9
+    .MA -- Macro Definition                     5-11
+    .EM -- End of Macro                         5-11
+

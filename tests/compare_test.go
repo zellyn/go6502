@@ -51,7 +51,7 @@ func TestFunctionalTestCompare(t *testing.T) {
 	}
 
 	var cc CycleCount
-	c := cpu.NewCPU(&m, &cc, cpu.VERSION_6502)
+	c := cpu.NewCPU(&m, cc.Tick, cpu.VERSION_6502)
 	c.Reset()
 
 	m.Reset(MODE_RECORD)

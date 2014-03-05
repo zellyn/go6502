@@ -6,10 +6,12 @@ function tables.
 package opcodes
 
 // Opcode addressing modes.
-type AddressingMode int
+type AddressingMode uint
+
+const MODE_UNKNOWN = 0
 
 const (
-	MODE_IMPLIED AddressingMode = iota
+	MODE_IMPLIED AddressingMode = 1 << iota
 	MODE_ABSOLUTE
 	MODE_INDIRECT
 	MODE_RELATIVE
@@ -23,6 +25,9 @@ const (
 	MODE_INDIRECT_X
 	MODE_A
 )
+
+// Logical OR of the three indirect modes
+const MODE_INDIRECT_ANY AddressingMode = MODE_INDIRECT | MODE_INDIRECT_X | MODE_INDIRECT_Y
 
 // Opcode read/write semantics: does the opcode read, write, or
 // rmw. Useful to distinguish between instructions further than just
@@ -162,20 +167,20 @@ var Opcodes = map[byte]Opcode{
 
 	// 3-opcode, 4*-cycle abs,X/Y
 	0x1D: {"ORA", MODE_ABS_X, RW_R},
-	0x19: {"ORA", MODE_ABS_X, RW_R},
-	0x39: {"AND", MODE_ABS_X, RW_R},
+	0x19: {"ORA", MODE_ABS_Y, RW_R},
+	0x39: {"AND", MODE_ABS_Y, RW_R},
 	0x3D: {"AND", MODE_ABS_X, RW_R},
-	0x59: {"EOR", MODE_ABS_X, RW_R},
+	0x59: {"EOR", MODE_ABS_Y, RW_R},
 	0x5D: {"EOR", MODE_ABS_X, RW_R},
-	0x79: {"ADC", MODE_ABS_X, RW_R},
+	0x79: {"ADC", MODE_ABS_Y, RW_R},
 	0x7D: {"ADC", MODE_ABS_X, RW_R},
+	0xB9: {"LDA", MODE_ABS_Y, RW_R},
 	0xBD: {"LDA", MODE_ABS_X, RW_R},
-	0xB9: {"LDA", MODE_ABS_X, RW_R},
-	0xD9: {"CMP", MODE_ABS_X, RW_R},
+	0xD9: {"CMP", MODE_ABS_Y, RW_R},
 	0xDD: {"CMP", MODE_ABS_X, RW_R},
-	0xF9: {"SBC", MODE_ABS_X, RW_R},
+	0xF9: {"SBC", MODE_ABS_Y, RW_R},
 	0xFD: {"SBC", MODE_ABS_X, RW_R},
-	0xBE: {"LDX", MODE_ABS_X, RW_R},
+	0xBE: {"LDX", MODE_ABS_Y, RW_R},
 	0xBC: {"LDY", MODE_ABS_X, RW_R},
 
 	// 3-opcode, 5-cycle abs,X/Y
@@ -253,4 +258,43 @@ var Opcodes = map[byte]Opcode{
 	0x7E: {"ROR", MODE_ABS_X, RW_RMW},
 	0xDE: {"DEC", MODE_ABS_X, RW_RMW},
 	0xFE: {"INC", MODE_ABS_X, RW_RMW},
+}
+
+// Information for lookup of opcodes by name and mode -------------------------
+
+type OpInfo struct {
+	Mode   AddressingMode
+	Length int
+	Byte   byte
+}
+
+type OpSummary struct {
+	Modes AddressingMode // bitmask of supported modes
+	Ops   []OpInfo
+}
+
+var ByName map[string]OpSummary
+
+func init() {
+	ByName = make(map[string]OpSummary)
+	for b, oc := range Opcodes {
+		info := OpInfo{oc.Mode, ModeLengths[oc.Mode], b}
+		summary := ByName[oc.Name]
+		summary.Modes |= oc.Mode
+		summary.Ops = append(summary.Ops, info)
+		ByName[oc.Name] = summary
+	}
+}
+
+func (s OpSummary) AnyModes(modes AddressingMode) bool {
+	return modes&s.Modes != 0
+}
+
+func (s OpSummary) OpForMode(mode AddressingMode) (OpInfo, bool) {
+	for _, o := range s.Ops {
+		if o.Mode == mode {
+			return o, true
+		}
+	}
+	return OpInfo{}, false
 }

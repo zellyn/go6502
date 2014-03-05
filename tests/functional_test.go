@@ -24,7 +24,7 @@ func (m *K64) Write(address uint16, value byte) {
 	m[address] = value
 }
 
-// Cycle counter for the tests. Satisfies the cpu.Ticker interface.
+// Cycle counter for the tests.
 type CycleCount uint64
 
 func (c *CycleCount) Tick() {
@@ -60,7 +60,7 @@ func TestFunctionalTestInstructions(t *testing.T) {
 	var cc CycleCount
 	OFFSET := 0xa
 	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
-	c := cpu.NewCPU(&m, &cc, cpu.VERSION_6502)
+	c := cpu.NewCPU(&m, cc.Tick, cpu.VERSION_6502)
 	c.Reset()
 	c.SetPC(0x1000)
 	for {
@@ -150,7 +150,7 @@ func TestDecimalMode6502(t *testing.T) {
 	OFFSET := 0x1000
 	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
 	m[1] = 0 // 6502
-	c := cpu.NewCPU(&m, &cc, cpu.VERSION_6502)
+	c := cpu.NewCPU(&m, cc.Tick, cpu.VERSION_6502)
 	c.Reset()
 	c.SetPC(0x1000)
 	for {
@@ -186,7 +186,7 @@ func TestDecimalMode65C02(t *testing.T) {
 	OFFSET := 0x1000
 	copy(m[OFFSET:len(bytes)+OFFSET], bytes)
 	m[1] = 1 // 65C02
-	c := cpu.NewCPU(&m, &cc, cpu.VERSION_65C02)
+	c := cpu.NewCPU(&m, cc.Tick, cpu.VERSION_65C02)
 	c.Reset()
 	c.SetPC(0x1000)
 	for {

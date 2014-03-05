@@ -42,9 +42,7 @@ type Memory interface {
 }
 
 // Ticker interface, for keeping track of cycles.
-type Ticker interface {
-	Tick()
-}
+type Ticker func()
 
 // Interrupt vectors.
 const (
@@ -146,7 +144,7 @@ func (c *cpu) Step() error {
 	c.oldPC = c.r.PC
 	i := c.m.Read(c.r.PC)
 	c.r.PC++
-	c.t.Tick()
+	c.t()
 
 	if f, ok := Opcodes[i]; ok {
 		f(c)
