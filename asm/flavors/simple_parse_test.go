@@ -26,6 +26,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, "* Comment", "{-}", ""},
 		{aa, "; Comment", "{-}", ""},
 		{mm, "* Comment", "{-}", ""},
+		{ss, "                                        far-out-comment", "{-}", ""},
 		{ss, "Label", "{- 'Label'}", ""},
 		{aa, "Label", "{- 'Label'}", ""},
 		{mm, "Label", "{- 'Label'}", ""},
@@ -118,6 +119,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " .EN", "{end}", ""},
 		{ss, `>SAM AB,$12,"A B","A, B, "" C"`,
 			`{call SAM {"AB", "$12", "A B", "A, B, \" C"}}`, ""},
+		{ss, " LDX #']+$80", "{LDX/imm (lsb (+ $005d $0080))}", "a2dd"},
 	}
 
 	// TODO(zellyn): Add tests for finalization of four SCMA directives:

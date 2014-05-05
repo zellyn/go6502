@@ -23,6 +23,9 @@ const cmdChars = letters + "."
 const fileChars = letters + digits + "."
 const operatorChars = "+-*/<>="
 
+// 40 spaces = comment column
+const comment_whitespace_prefix = "                                        "
+
 type directiveInfo struct {
 	Type inst.Type
 	Func func(inst.I, *lines.Parse) (inst.I, error)
@@ -82,16 +85,22 @@ func (a *SCMA) ParseInstr(line lines.Line) (inst.I, error) {
 	if lp.AcceptRun(digits) {
 		s := lp.Emit()
 		if len(s) != 4 {
-			return inst.I{}, fmt.Errorf("Line number must be exactly 4 digits: %s", s)
+			return inst.I{}, line.Errorf("line number must be exactly 4 digits: %s", s)
 		}
 		if !lp.Consume(" ") && lp.Peek() != lines.Eol {
-			return inst.I{}, fmt.Errorf("Line number (%s) followed by non-space", s)
+			return inst.I{}, line.Errorf("line number (%s) followed by non-space", s)
 		}
 		i, err := strconv.ParseUint(s, 10, 16)
 		if err != nil {
-			return inst.I{}, fmt.Errorf("Invalid line number: %s: %s", s, err)
+			return inst.I{}, line.Errorf("invalid line number: %s: %s", s, err)
 		}
 		in.DeclaredLine = uint16(i)
+	}
+
+	// Comment by virtue of long whitespace prefix
+	if strings.HasPrefix(lp.Rest(), comment_whitespace_prefix) {
+		in.Type = inst.TypeNone
+		return in, nil
 	}
 
 	// Empty line or comment
@@ -124,6 +133,10 @@ func (a *SCMA) DefaultOrigin() (uint16, error) {
 	return 0x0800, nil
 }
 
+func (a *SCMA) SetWidthsOnFirstPass() bool {
+	return true
+}
+
 // parseCmd parses the "command" part of an instruction: we expect to be
 // looking at a non-whitespace character.
 func (a *SCMA) parseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
@@ -132,7 +145,7 @@ func (a *SCMA) parseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	if !lp.AcceptRun(cmdChars) {
 		c := lp.Next()
-		return inst.I{}, fmt.Errorf("Expecting instruction, found '%c' (%d)", c, c)
+		return inst.I{}, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
 	}
 	in.Command = lp.Emit()
 	if dir, ok := a.directives[in.Command]; ok {
@@ -147,7 +160,7 @@ func (a *SCMA) parseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 		in.Type = inst.TypeOp
 		return a.parseOpArgs(in, lp, summary)
 	}
-	return inst.I{}, fmt.Errorf(`Not implemented: "%s": `, in.Command, in.Line)
+	return inst.I{}, in.Errorf(`not implemented: "%s": `, in.Command, in.Line)
 }
 
 // parseMacroCall parses a macro call. We expect to be looking at a the
@@ -156,14 +169,14 @@ func (a *SCMA) parseMacroCall(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Type = inst.TypeMacroCall
 	if !lp.AcceptRun(cmdChars) {
 		c := lp.Next()
-		return inst.I{}, fmt.Errorf("Expecting macro name, found '%c' (%d)", c, c)
+		return inst.I{}, in.Errorf("expecting macro name, found '%c' (%d)", c, c)
 	}
 	in.Command = lp.Emit()
 
 	lp.Consume(whitespace)
 
 	for {
-		s, err := a.parseMacroArg(lp)
+		s, err := a.parseMacroArg(in, lp)
 		if err != nil {
 			return inst.I{}, err
 		}
@@ -178,9 +191,9 @@ func (a *SCMA) parseMacroCall(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 // parseMacroArg parses a single macro argument. We expect to be looking at the first
 // character of a macro argument.
-func (a *SCMA) parseMacroArg(lp *lines.Parse) (string, error) {
+func (a *SCMA) parseMacroArg(in inst.I, lp *lines.Parse) (string, error) {
 	if lp.Peek() == '"' {
-		return a.parseQuoted(lp)
+		return a.parseQuoted(in, lp)
 	}
 	lp.AcceptUntil(whitespace + ",")
 	return lp.Emit(), nil
@@ -188,7 +201,7 @@ func (a *SCMA) parseMacroArg(lp *lines.Parse) (string, error) {
 
 // parseQuoted parses a single quoted string macro argument. We expect
 // to be looking at the first quote.
-func (a *SCMA) parseQuoted(lp *lines.Parse) (string, error) {
+func (a *SCMA) parseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 	if !lp.Consume(`"`) {
 		panic(fmt.Sprintf("parseQuoted called not looking at a quote"))
 	}
@@ -202,12 +215,12 @@ func (a *SCMA) parseQuoted(lp *lines.Parse) (string, error) {
 	s := lp.Emit()
 	if !lp.Consume(`"`) {
 		c := lp.Peek()
-		return "", fmt.Errorf("Expected closing quote; got %s", c)
+		return "", in.Errorf("Expected closing quote; got %s", c)
 	}
 
 	c := lp.Peek()
 	if c != ',' && c != ' ' && c != lines.Eol && c != '\t' {
-		return "", fmt.Errorf("Unexpected char after quoted string: '%s'", c)
+		return "", in.Errorf("Unexpected char after quoted string: '%s'", c)
 	}
 
 	return strings.Replace(s, `""`, `"`, -1), nil
@@ -234,7 +247,7 @@ func (a *SCMA) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 	lp.Consume(whitespace)
 	if lp.Consume(whitespace) || lp.Peek() == lines.Eol {
 		if !summary.AnyModes(opcodes.MODE_A) {
-			return i, fmt.Errorf("%s with no arguments", in.Command)
+			return i, in.Errorf("%s with no arguments", in.Command)
 		}
 		op, ok := summary.OpForMode(opcodes.MODE_A)
 		if !ok {
@@ -251,10 +264,10 @@ func (a *SCMA) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 
 	indirect := lp.Consume("(")
 	if indirect && !summary.AnyModes(opcodes.MODE_INDIRECT_ANY) {
-		return i, fmt.Errorf("%s doesn't support any indirect modes", in.Command)
+		return i, in.Errorf("%s doesn't support any indirect modes", in.Command)
 	}
 	xy := '-'
-	expr, err := a.parseExpression(lp)
+	expr, err := a.parseExpression(in, lp)
 	if err != nil {
 		return i, err
 	}
@@ -265,25 +278,25 @@ func (a *SCMA) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 			xy = 'x'
 		} else if lp.Consume("yY") {
 			if indirect {
-				return i, fmt.Errorf(",Y unexpected inside parens")
+				return i, in.Errorf(",Y unexpected inside parens")
 			}
 			xy = 'y'
 		} else {
-			return i, fmt.Errorf("X or Y expected after comma")
+			return i, in.Errorf("X or Y expected after comma")
 		}
 	}
 	comma2 := false
 	if indirect {
 		if !lp.Consume(")") {
-			return i, fmt.Errorf("Expected closing paren")
+			return i, in.Errorf("Expected closing paren")
 		}
 		comma2 = lp.Consume(",")
 		if comma2 {
 			if comma {
-				return i, fmt.Errorf("Cannot have ,X or ,Y twice.")
+				return i, in.Errorf("Cannot have ,X or ,Y twice.")
 			}
 			if !lp.Consume("yY") {
-				return i, fmt.Errorf("Only ,Y can follow parens.")
+				return i, in.Errorf("Only ,Y can follow parens.")
 			}
 			xy = 'y'
 		}
@@ -294,7 +307,7 @@ func (a *SCMA) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 
 func (a *SCMA) parseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
-	expr, err := a.parseExpression(lp)
+	expr, err := a.parseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
 	}
@@ -317,13 +330,13 @@ func (a *SCMA) parseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	delim := lp.Next()
 	if delim == lines.Eol || strings.IndexRune(whitespace, delim) >= 0 {
-		return inst.I{}, fmt.Errorf("%s expects delimeter, found '%s'", in.Command, delim)
+		return inst.I{}, in.Errorf("%s expects delimeter, found '%s'", in.Command, delim)
 	}
 	lp.Ignore()
 	lp.AcceptUntil(string(delim))
 	delim2 := lp.Next()
 	if delim != delim2 {
-		return inst.I{}, fmt.Errorf("%s: expected closing delimeter '%s'; got '%s'", in.Command, delim, delim2)
+		return inst.I{}, in.Errorf("%s: expected closing delimeter '%s'; got '%s'", in.Command, delim, delim2)
 	}
 	lp.Backup()
 	in.Data = []byte(lp.Emit())
@@ -338,7 +351,7 @@ func (a *SCMA) parseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 func (a *SCMA) parseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
-	ex, err := a.parseExpression(lp)
+	ex, err := a.parseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
 	}
@@ -349,7 +362,7 @@ func (a *SCMA) parseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
 func (a *SCMA) parseData(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
 	for {
-		ex, err := a.parseExpression(lp)
+		ex, err := a.parseExpression(in, lp)
 		if err != nil {
 			return inst.I{}, err
 		}
@@ -363,7 +376,7 @@ func (a *SCMA) parseData(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 func (a *SCMA) parseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
-	expr, err := a.parseExpression(lp)
+	expr, err := a.parseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
 	}
@@ -377,7 +390,7 @@ func (a *SCMA) parseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 func (a *SCMA) parseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
-	expr, err := a.parseExpression(lp)
+	expr, err := a.parseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
 	}
@@ -392,15 +405,15 @@ func (a *SCMA) parseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 func (a *SCMA) parseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
 	if !lp.AcceptRun(hexdigits) {
-		return inst.I{}, fmt.Errorf("%s expects hex digits; got '%s'", in.Command, lp.Next())
+		return inst.I{}, in.Errorf("%s expects hex digits; got '%s'", in.Command, lp.Next())
 	}
 	hs := lp.Emit()
 	if len(hs)%2 != 0 {
-		return inst.I{}, fmt.Errorf("%s expects pairs of hex digits; got %d", in.Command, len(hs))
+		return inst.I{}, in.Errorf("%s expects pairs of hex digits; got %d", in.Command, len(hs))
 	}
 	var err error
 	if in.Data, err = hex.DecodeString(hs); err != nil {
-		return inst.I{}, fmt.Errorf("%s: error decoding hex string: %s", in.Command, err)
+		return inst.I{}, in.Errorf("%s: error decoding hex string: %s", in.Command, err)
 	}
 	return in, nil
 }
@@ -408,7 +421,7 @@ func (a *SCMA) parseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
 func (a *SCMA) parseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
 	if !lp.AcceptRun(fileChars) {
-		return inst.I{}, fmt.Errorf("Expecting filename, found '%c'", lp.Next())
+		return inst.I{}, in.Errorf("Expecting filename, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
 	in.WidthKnown = true
@@ -427,10 +440,10 @@ func (a *SCMA) parseNoArgDir(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *SCMA) parseNotImplemented(in inst.I, lp *lines.Parse) (inst.I, error) {
-	return inst.I{}, fmt.Errorf("Not implemented (yet?): %s", in.Command)
+	return inst.I{}, in.Errorf("not implemented (yet?): %s", in.Command)
 }
 
-func (a *SCMA) parseExpression(lp *lines.Parse) (*expr.E, error) {
+func (a *SCMA) parseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
 	var outer *expr.E
 	if lp.Accept("#/") {
 		switch lp.Emit() {
@@ -441,14 +454,14 @@ func (a *SCMA) parseExpression(lp *lines.Parse) (*expr.E, error) {
 		}
 	}
 
-	tree, err := a.parseTerm(lp)
+	tree, err := a.parseTerm(in, lp)
 	if err != nil {
 		return &expr.E{}, err
 	}
 
 	for lp.Accept(operatorChars) {
 		c := lp.Emit()
-		right, err := a.parseTerm(lp)
+		right, err := a.parseTerm(in, lp)
 		if err != nil {
 			return &expr.E{}, err
 		}
@@ -462,7 +475,7 @@ func (a *SCMA) parseExpression(lp *lines.Parse) (*expr.E, error) {
 	return tree, nil
 }
 
-func (a *SCMA) parseTerm(lp *lines.Parse) (*expr.E, error) {
+func (a *SCMA) parseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 	ex := &expr.E{}
 	top := ex
 
@@ -482,12 +495,12 @@ func (a *SCMA) parseTerm(lp *lines.Parse) (*expr.E, error) {
 	if lp.Consume("$") {
 		if !lp.AcceptRun(hexdigits) {
 			c := lp.Next()
-			return &expr.E{}, fmt.Errorf("Expecting hex number, found '%c' (%d)", c, c)
+			return &expr.E{}, in.Errorf("expecting hex number, found '%c' (%d)", c, c)
 		}
 		s := lp.Emit()
 		i, err := strconv.ParseUint(s, 16, 16)
 		if err != nil {
-			return &expr.E{}, fmt.Errorf("Invalid hex number: %s: %s", s, err)
+			return &expr.E{}, in.Errorf("invalid hex number: %s: %s", s, err)
 		}
 		ex.Op = expr.OpLeaf
 		ex.Val = uint16(i)
@@ -499,17 +512,29 @@ func (a *SCMA) parseTerm(lp *lines.Parse) (*expr.E, error) {
 		s := lp.Emit()
 		i, err := strconv.ParseUint(s, 10, 16)
 		if err != nil {
-			return &expr.E{}, fmt.Errorf("Invalid number: %s: %s", s, err)
+			return &expr.E{}, in.Errorf("invalid number: %s: %s", s, err)
 		}
 		ex.Op = expr.OpLeaf
 		ex.Val = uint16(i)
 		return top, nil
 	}
 
+	// Character
+	if lp.Consume("'") {
+		c := lp.Next()
+		if c == lines.Eol {
+			return &expr.E{}, in.Errorf("end of line after quote")
+		}
+		ex.Op = expr.OpLeaf
+		ex.Val = uint16(c)
+		lp.Ignore()
+		return top, nil
+	}
+
 	// Label
 	if !lp.AcceptRun(labelChars) {
 		c := lp.Next()
-		return &expr.E{}, fmt.Errorf("Expecting *, (hex) number, or label; found '%c' (%d)", c, c)
+		return &expr.E{}, in.Errorf("expecting *, (hex) number, or label; found '%c' (%d)", c, c)
 	}
 
 	ex.Op = expr.OpLeaf

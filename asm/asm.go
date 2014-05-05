@@ -11,6 +11,7 @@ import (
 type Flavor interface {
 	ParseInstr(Line lines.Line) (inst.I, error)
 	DefaultOrigin() (uint16, error)
+	SetWidthsOnFirstPass() bool
 	context.Context
 }
 
@@ -56,49 +57,49 @@ func (a *Assembler) Load(filename string) error {
 			return err
 		}
 
-		if _, err := a.passInst(&in, false, false); err != nil {
+		if _, err := a.passInst(&in, a.Flavor.SetWidthsOnFirstPass(), false); err != nil {
 			return err
 		}
 
 		switch in.Type {
 		case inst.TypeUnknown:
-			return fmt.Errorf("Unknown instruction: %s", line)
+			return in.Errorf("unknown instruction: %s", line)
 		case inst.TypeMacroStart:
-			return fmt.Errorf("Macro start not (yet) implemented: %s", line)
+			return in.Errorf("macro start not (yet) implemented: %s", line)
 		case inst.TypeMacroCall:
-			return fmt.Errorf("Macro call not (yet) implemented: %s", line)
+			return in.Errorf("macro call not (yet) implemented: %s", line)
 		case inst.TypeIfdef:
 			if len(in.Exprs) == 0 {
 				panic(fmt.Sprintf("Ifdef got parsed with no expression: %s", line))
 			}
-			val, err := in.Exprs[0].Eval(a.Flavor)
+			val, err := in.Exprs[0].Eval(a.Flavor, in.Line)
 			if err != nil {
-				return fmt.Errorf("Cannot eval ifdef condition: %v", err)
+				return in.Errorf("cannot eval ifdef condition: %v", err)
 			}
 			ifdefs = append([]bool{val != 0}, ifdefs...)
 
 		case inst.TypeIfdefElse:
 			if len(ifdefs) == 0 {
-				return fmt.Errorf("Ifdef else branch encountered outside ifdef: %s", line)
+				return in.Errorf("ifdef else branch encountered outside ifdef: %s", line)
 			}
 			ifdefs[0] = !ifdefs[0]
 		case inst.TypeIfdefEnd:
 			if len(ifdefs) == 0 {
-				return fmt.Errorf("Ifdef end encountered outside ifdef: %s", line)
+				return in.Errorf("ifdef end encountered outside ifdef: %s", line)
 			}
 			ifdefs = ifdefs[1:]
 		case inst.TypeInclude:
 			subContext := lines.Context{Filename: in.TextArg, Parent: in.Line}
 			subLs, err := lines.NewFileLineSource(in.TextArg, subContext, a.Opener)
 			if err != nil {
-				return fmt.Errorf("error including file: %v", err)
+				return in.Errorf("error including file: %v", err)
 			}
 			lineSources = append([]lines.LineSource{subLs}, lineSources...)
 			continue // no need to append
 		case inst.TypeTarget:
-			return fmt.Errorf("Target not (yet) implemented: %s", line)
+			return in.Errorf("target not (yet) implemented: %s", line)
 		case inst.TypeSegment:
-			return fmt.Errorf("Segment not (yet) implemented: %s", line)
+			return in.Errorf("segment not (yet) implemented: %s", line)
 		case inst.TypeEnd:
 			return nil
 		default:
@@ -115,7 +116,7 @@ func (a *Assembler) initPass() {
 	if org, err := a.Flavor.DefaultOrigin(); err == nil {
 		a.Flavor.SetAddr(org)
 	} else {
-		a.Flavor.ClearAddr()
+		a.Flavor.ClearAddr("beginning of assembly")
 	}
 }
 
@@ -125,9 +126,9 @@ func (a *Assembler) initPass() {
 // instruction to decide its final width. If final is true, and the
 // instruction cannot be finalized, it returns an error.
 func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, err error) {
-	fmt.Printf("PLUGH: in.Compute(a.Flavor, true, true) on %s\n", in)
+	// fmt.Printf("PLUGH: in.Compute(a.Flavor, true, true) on %s\n", in)
 	isFinal, err = in.Compute(a.Flavor, setWidth, final)
-	fmt.Printf("PLUGH: isFinal=%v, in.Final=%v, in.WidthKnown=%v, in.MinWidth=%v\n", isFinal, in.Final, in.WidthKnown, in.MinWidth)
+	// fmt.Printf("PLUGH: isFinal=%v, in.Final=%v, in.WidthKnown=%v, in.MinWidth=%v\n", isFinal, in.Final, in.WidthKnown, in.MinWidth)
 	if err != nil {
 		return false, err
 	}
@@ -140,7 +141,9 @@ func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, er
 		addr, _ := a.Flavor.GetAddr()
 		a.Flavor.SetAddr(addr + in.MinWidth)
 	} else {
-		a.Flavor.ClearAddr()
+		if a.Flavor.AddrKnown() {
+			a.Flavor.ClearAddr(in.Sprintf("lost known address"))
+		}
 	}
 
 	return isFinal, nil
@@ -150,7 +153,7 @@ func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, er
 // instructions to set their final width. If final is true, it returns
 // an error for any instruction that cannot be finalized.
 func (a *Assembler) Pass(setWidth, final bool) (isFinal bool, err error) {
-	fmt.Printf("PLUGH: Pass(%v, %v): %d instructions\n", setWidth, final, len(a.Insts))
+	// fmt.Printf("PLUGH: Pass(%v, %v): %d instructions\n", setWidth, final, len(a.Insts))
 	setWidth = setWidth || final // final ⊢ setWidth
 
 	a.initPass()
@@ -162,9 +165,9 @@ func (a *Assembler) Pass(setWidth, final bool) (isFinal bool, err error) {
 			return false, err
 		}
 		if final && !instFinal {
-			return false, fmt.Errorf("Cannot finalize instruction: %s", in)
+			return false, in.Errorf("cannot finalize instruction: %s", in)
 		}
-		fmt.Printf("PLUGH: instFinal=%v, in.Final=%v, in.WidthKnown=%v, in.MinWidth=%v\n", instFinal, in.Final, in.WidthKnown, in.MinWidth)
+		// fmt.Printf("PLUGH: instFinal=%v, in.Final=%v, in.WidthKnown=%v, in.MinWidth=%v\n", instFinal, in.Final, in.WidthKnown, in.MinWidth)
 		isFinal = isFinal && instFinal
 	}
 
@@ -177,7 +180,7 @@ func (a *Assembler) RawBytes() ([]byte, error) {
 	result := []byte{}
 	for _, in := range a.Insts {
 		if !in.Final {
-			return []byte{}, fmt.Errorf("cannot finalize value: %s", in)
+			return []byte{}, in.Errorf("cannot finalize value: %s", in)
 		}
 		result = append(result, in.Data...)
 	}

@@ -41,3 +41,19 @@ func (l Line) Text() string {
 func (l Line) String() string {
 	return fmt.Sprintf("%s:%d: %s", l.Context.Filename, l.LineNo, l.Parse.Text())
 }
+
+func (l Line) Errorf(format string, a ...interface{}) error {
+	filename := "unknown file"
+	if l.Context != nil {
+		filename = l.Context.Filename
+	}
+	return fmt.Errorf(fmt.Sprintf("%s:%d: %s", filename, l.LineNo, format), a...)
+}
+
+func (l Line) Sprintf(format string, a ...interface{}) string {
+	filename := "unknown file"
+	if l.Context != nil {
+		filename = l.Context.Filename
+	}
+	return fmt.Sprintf(fmt.Sprintf("%s:%d: %s", filename, l.LineNo, format), a...)
+}

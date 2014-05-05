@@ -31,3 +31,7 @@ func (a *AS65) Zero() (uint16, error) {
 func (a *AS65) DefaultOrigin() (uint16, error) {
 	return 0, nil
 }
+
+func (a *AS65) SetWidthsOnFirstPass() bool {
+	return false
+}

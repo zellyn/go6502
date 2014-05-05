@@ -182,13 +182,13 @@ func (i *I) Compute(c context.Context, setWidth bool, final bool) (bool, error) 
 func (i *I) FixLabels(last string) error {
 	if i.Label != "" && i.Label[0] == '.' {
 		if last == "" {
-			return fmt.Errorf("Reference to sub-label '%s' before full label.", i.Label)
+			return i.Errorf("Reference to sub-label '%s' before full label.", i.Label)
 		}
-		i.Label = last + i.Label
+		i.Label = last + "/" + i.Label
 	}
 
 	for _, e := range i.Exprs {
-		if err := e.FixLabels(last); err != nil {
+		if err := e.FixLabels(last, i.Line); err != nil {
 			return err
 		}
 	}
@@ -213,7 +213,7 @@ func (i *I) computeLabel(c context.Context, setWidth bool, final bool) error {
 
 	lval, lok := c.Get(i.Label)
 	if lok && addr != lval {
-		return fmt.Errorf("Trying to set label '%s' to $%04x, but it already has value $%04x", i.Label, addr, lval)
+		return i.Errorf("Trying to set label '%s' to $%04x, but it already has value $%04x", i.Label, addr, lval)
 	}
 	c.Set(i.Label, addr)
 	return nil
@@ -234,7 +234,7 @@ func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, err
 	for _, e := range i.Exprs {
 		w := e.Width()
 		width += w
-		val, labelMissing, err := e.CheckedEval(c)
+		val, labelMissing, err := e.CheckedEval(c, i.Line)
 		if err != nil && !labelMissing {
 			return false, err
 		}
@@ -263,7 +263,7 @@ func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, err
 }
 
 func (i *I) computeBlock(c context.Context, setWidth bool, final bool) (bool, error) {
-	val, err := i.Exprs[0].Eval(c)
+	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err == nil {
 		i.Value = val
 		i.WidthKnown = true
@@ -272,7 +272,7 @@ func (i *I) computeBlock(c context.Context, setWidth bool, final bool) (bool, er
 		i.MaxWidth = val
 	} else {
 		if setWidth || final {
-			return false, fmt.Errorf("block storage with unknown size")
+			return false, i.Errorf("block storage with unknown size")
 		}
 	}
 	return i.Final, nil
@@ -283,7 +283,7 @@ func (i *I) computeMustKnow(c context.Context, setWidth bool, final bool) (bool,
 	i.MinWidth = 0
 	i.MaxWidth = 0
 	i.Final = true
-	val, err := i.Exprs[0].Eval(c)
+	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err != nil {
 		return false, err
 	}
@@ -313,7 +313,7 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 	if len(i.Exprs) == 0 {
 		panic(fmt.Sprintf("Reached computeOp for '%s' with no expressions", i.Command))
 	}
-	val, labelMissing, err := i.Exprs[0].CheckedEval(c)
+	val, labelMissing, err := i.Exprs[0].CheckedEval(c, i.Line)
 	// A real error
 	if !labelMissing && err != nil {
 		return false, err
@@ -372,17 +372,17 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 		curr, ok := c.GetAddr()
 		if !ok {
 			if final {
-				return false, fmt.Errorf("Cannot determine current address for '%s'", i.Command)
+				return false, i.Errorf("cannot determine current address for '%s'", i.Command)
 			}
 			return false, nil
 		}
 		// Found both current and target addresses
 		offset := int32(val) - (int32(curr) + 2)
 		if offset > 127 {
-			return false, fmt.Errorf("%s cannot jump forward %d (max 127)", i.Command, offset)
+			return false, i.Errorf("%s cannot jump forward %d (max 127)", i.Command, offset)
 		}
 		if offset < -128 {
-			return false, fmt.Errorf("%s cannot jump back %d (max -128)", i.Command, offset)
+			return false, i.Errorf("%s cannot jump back %d (max -128)", i.Command, offset)
 		}
 		val = uint16(offset)
 	}
@@ -402,4 +402,12 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 		panic(fmt.Sprintf("computeOp reached erroneously for '%s'", i.Command))
 	}
 	return true, nil
+}
+
+func (i I) Errorf(format string, a ...interface{}) error {
+	return i.Line.Errorf(format, a...)
+}
+
+func (i I) Sprintf(format string, a ...interface{}) string {
+	return i.Line.Sprintf(format, a...)
 }

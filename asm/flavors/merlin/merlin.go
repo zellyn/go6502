@@ -32,3 +32,7 @@ func (a *Merlin) Zero() (uint16, error) {
 func (a *Merlin) DefaultOrigin() (uint16, error) {
 	return 0x8000, nil
 }
+
+func (a *Merlin) SetWidthsOnFirstPass() bool {
+	panic("don't know yet")
+}

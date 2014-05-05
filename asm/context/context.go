@@ -6,7 +6,8 @@ type Context interface {
 	Set(name string, value uint16)
 	Get(name string) (uint16, bool)
 	SetAddr(uint16)
-	ClearAddr()
+	ClearAddr(message string)
+	ClearMesg() string
 	GetAddr() (uint16, bool)
 	Zero() (uint16, error) // type ZeroFunc
 	RemoveChanged()
@@ -20,6 +21,7 @@ type SimpleContext struct {
 	symbols   map[string]symbolValue
 	addr      int32
 	lastLabel string
+	clearMesg string // Saved message describing why Addr was cleared.
 }
 
 type symbolValue struct {
@@ -46,12 +48,17 @@ func (sc *SimpleContext) Get(name string) (uint16, bool) {
 	return s.v, found
 }
 
-func (sc *SimpleContext) ClearAddr() {
+func (sc *SimpleContext) ClearAddr(message string) {
 	sc.addr = -1
+	sc.clearMesg = message
 }
 
 func (sc *SimpleContext) SetAddr(addr uint16) {
 	sc.addr = int32(addr)
+}
+
+func (sc *SimpleContext) ClearMesg() string {
+	return sc.clearMesg
 }
 
 func (sc *SimpleContext) GetAddr() (uint16, bool) {

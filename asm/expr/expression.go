@@ -5,14 +5,15 @@ import (
 	"fmt"
 
 	"github.com/zellyn/go6502/asm/context"
+	"github.com/zellyn/go6502/asm/lines"
 )
 
 type UnknownLabelError struct {
-	Label string
+	Err error
 }
 
 func (e UnknownLabelError) Error() string {
-	return fmt.Sprintf(`unknown label: "%s"`, e.Label)
+	return e.Err.Error()
 }
 
 type Operator int
@@ -99,7 +100,7 @@ func (e *E) Width() uint16 {
 	return 2
 }
 
-func (e *E) Eval(ctx context.Context) (uint16, error) {
+func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 	if e == nil {
 		return 0, errors.New("cannot Eval() nil expression")
 	}
@@ -111,22 +112,27 @@ func (e *E) Eval(ctx context.Context) (uint16, error) {
 		if val, ok := ctx.Get(e.Text); ok {
 			return val, nil
 		}
-		return 0, UnknownLabelError{Label: e.Text}
+		if e.Text == "*" && !ctx.AddrKnown() {
+			e := ln.Errorf("address unknown due to %v", ctx.ClearMesg())
+			return 0, UnknownLabelError{Err: e}
+
+		}
+		return 0, UnknownLabelError{Err: ln.Errorf("unknown label: %s", e.Text)}
 	case OpMinus:
-		l, err := e.Left.Eval(ctx)
+		l, err := e.Left.Eval(ctx, ln)
 		if err != nil {
 			return 0, err
 		}
 		if e.Right == nil {
 			return -l, nil
 		}
-		r, err := e.Right.Eval(ctx)
+		r, err := e.Right.Eval(ctx, ln)
 		if err != nil {
 			return 0, err
 		}
 		return l - r, nil
 	case OpMsb, OpLsb:
-		l, err := e.Left.Eval(ctx)
+		l, err := e.Left.Eval(ctx, ln)
 		if err != nil {
 			return 0, err
 		}
@@ -137,11 +143,11 @@ func (e *E) Eval(ctx context.Context) (uint16, error) {
 	case OpByte:
 		return e.Val, nil
 	case OpPlus, OpMul, OpDiv, OpLt, OpGt, OpEq:
-		l, err := e.Left.Eval(ctx)
+		l, err := e.Left.Eval(ctx, ln)
 		if err != nil {
 			return 0, err
 		}
-		r, err := e.Right.Eval(ctx)
+		r, err := e.Right.Eval(ctx, ln)
 		if err != nil {
 			return 0, err
 		}
@@ -177,8 +183,8 @@ func (e *E) Eval(ctx context.Context) (uint16, error) {
 }
 
 // CheckedEval calls Eval, but also turns UnknownLabelErrors into labelMissing booleans.
-func (e *E) CheckedEval(ctx context.Context) (val uint16, labelMissing bool, err error) {
-	val, err = e.Eval(ctx)
+func (e *E) CheckedEval(ctx context.Context, ln *lines.Line) (val uint16, labelMissing bool, err error) {
+	val, err = e.Eval(ctx, ln)
 	switch err.(type) {
 	case nil:
 		return val, false, nil
@@ -189,21 +195,21 @@ func (e *E) CheckedEval(ctx context.Context) (val uint16, labelMissing bool, err
 }
 
 // FixLabels attempts to turn .1 into LAST_LABEL.1
-func (e *E) FixLabels(last string) error {
+func (e *E) FixLabels(last string, ln *lines.Line) error {
 	if e.Text != "" && e.Text[0] == '.' {
 		if last == "" {
-			return fmt.Errorf("Reference to sub-label '%s' before full label.", e.Text)
+			return ln.Errorf("reference to sub-label '%s' before full label.", e.Text)
 		}
-		e.Text = last + e.Text
+		e.Text = last + "/" + e.Text
 	}
 
 	if e.Left != nil {
-		if err := e.Left.FixLabels(last); err != nil {
+		if err := e.Left.FixLabels(last, ln); err != nil {
 			return err
 		}
 	}
 	if e.Right != nil {
-		return e.Right.FixLabels(last)
+		return e.Right.FixLabels(last, ln)
 	}
 
 	return nil

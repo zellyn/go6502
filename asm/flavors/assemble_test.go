@@ -32,6 +32,13 @@ func TestMultiline(t *testing.T) {
 			"L2 NOP",
 		}, nil, "ad0300ea", false},
 
+		// sc-asm sets instruction widths on the first pass
+		{ss, "Later label: wide", []string{
+			" LDA FOO",
+			"FOO .EQ $FF",
+			" NOP",
+		}, nil, "adff00ea", true},
+
 		// Sub-labels
 		{ss, "Sublabels", []string{
 			"L1 BEQ .1",
