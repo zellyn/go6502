@@ -35,14 +35,21 @@ func NewSimple(s string) Line {
 	return NewLine(s, 0, &Context{Filename: testFilename})
 }
 
-func (c Context) GetMacroCall() int {
+func (c *Context) GetMacroCall() int {
+	if c == nil {
+		return 0
+	}
 	if c.MacroCall > 0 {
 		return c.MacroCall
 	}
-	if c.Parent == nil || c.Parent.Context == nil {
+	return c.Parent.GetMacroCall()
+}
+
+func (l *Line) GetMacroCall() int {
+	if l == nil {
 		return 0
 	}
-	return c.Parent.Context.GetMacroCall()
+	return l.Context.GetMacroCall()
 }
 
 func (l Line) Text() string {

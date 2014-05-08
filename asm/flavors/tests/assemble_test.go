@@ -140,14 +140,14 @@ func TestMultiline(t *testing.T) {
 			"       .MA INCD    MACRO NAME",
 			"       INC ]1      CALL PARAMETER",
 			"       BNE :1      PRIVATE LABEL",
-			"       INC ]1+l",
+			"       INC ]1+1",
 			":1",
 			"       .EM         END OF DEFINITION",
 			"       >INCD PTR",
 			"PTR .HS 0000",
 			"ZPTR .EQ $42",
 			"       >INCD ZPTR",
-		}, nil, "", true},
+		}, nil, "ee0808d003ee09080000e642d002e643", true},
 
 		// Macro, conditional assembly
 		{ss, "Macro, conditional assembly", []string{

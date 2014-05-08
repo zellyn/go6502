@@ -194,22 +194,21 @@ func (e *E) CheckedEval(ctx context.Context, ln *lines.Line) (val uint16, labelM
 	return val, false, err
 }
 
-// FixLabels attempts to turn .1 into LAST_LABEL.1
-func (e *E) FixLabels(last string, ln *lines.Line) error {
-	if e.Text != "" && e.Text[0] == '.' {
-		if last == "" {
-			return ln.Errorf("reference to sub-label '%s' before full label.", e.Text)
-		}
-		e.Text = last + "/" + e.Text
+// FixLabels attempts to turn .1 into LAST_LABEL.1, etc.
+func (e *E) FixLabels(labeler context.Labeler, macroCall int, ln *lines.Line) error {
+	newL, err := labeler.FixLabel(e.Text, macroCall)
+	if err != nil {
+		return ln.Errorf("%v", err)
 	}
+	e.Text = newL
 
 	if e.Left != nil {
-		if err := e.Left.FixLabels(last, ln); err != nil {
+		if err := e.Left.FixLabels(labeler, macroCall, ln); err != nil {
 			return err
 		}
 	}
 	if e.Right != nil {
-		return e.Right.FixLabels(last, ln)
+		return e.Right.FixLabels(labeler, macroCall, ln)
 	}
 
 	return nil

@@ -181,17 +181,21 @@ func (i *I) Compute(c context.Context, setWidth bool, final bool) (bool, error) 
 	return true, nil
 }
 
-// FixLabels attempts to turn .1 into LAST_LABEL.1
-func (i *I) FixLabels(last string) error {
-	if i.Label != "" && i.Label[0] == '.' {
-		if last == "" {
-			return i.Errorf("Reference to sub-label '%s' before full label.", i.Label)
-		}
-		i.Label = last + "/" + i.Label
+// FixLabels attempts to turn .1 into LAST_LABEL.1, etc.
+func (i *I) FixLabels(labeler context.Labeler) error {
+	macroCall := i.Line.GetMacroCall()
+	parent := labeler.IsNewParentLabel(i.Label)
+	newL, err := labeler.FixLabel(i.Label, macroCall)
+	if err != nil {
+		return i.Errorf("%v", err)
+	}
+	i.Label = newL
+	if parent {
+		labeler.SetLastLabel(i.Label)
 	}
 
 	for _, e := range i.Exprs {
-		if err := e.FixLabels(last, i.Line); err != nil {
+		if err := e.FixLabels(labeler, macroCall, i.Line); err != nil {
 			return err
 		}
 	}

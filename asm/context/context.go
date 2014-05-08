@@ -12,8 +12,6 @@ type Context interface {
 	Zero() (uint16, error) // type ZeroFunc
 	RemoveChanged()
 	AddrKnown() bool
-	GetLastLabel() string
-	SetLastLabel(string)
 	Clear()
 }
 
@@ -89,14 +87,6 @@ func (sc *SimpleContext) RemoveChanged() {
 			delete(sc.symbols, n)
 		}
 	}
-}
-
-func (sc *SimpleContext) GetLastLabel() string {
-	return sc.lastLabel
-}
-
-func (sc *SimpleContext) SetLastLabel(l string) {
-	sc.lastLabel = l
 }
 
 func (sc *SimpleContext) Clear() {

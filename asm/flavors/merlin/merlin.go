@@ -14,6 +14,7 @@ import (
 
 type Merlin struct {
 	context.SimpleContext
+	context.LabelerBase
 }
 
 func New() *Merlin {
@@ -39,4 +40,12 @@ func (a *Merlin) SetWidthsOnFirstPass() bool {
 
 func (a *Merlin) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
 	panic("Merlin.ReplaceMacroArgs not implemented yet.")
+}
+
+func (a *Merlin) IsNewParentLabel(label string) bool {
+	return label != "" && label[0] != '.'
+}
+
+func (a *Merlin) FixLabel(label string, macroCount int) (string, error) {
+	panic("Merlin.FixLabel not implemented yet.")
 }

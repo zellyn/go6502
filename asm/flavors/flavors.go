@@ -12,4 +12,5 @@ type F interface {
 	SetWidthsOnFirstPass() bool
 	ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error)
 	context.Context
+	context.Labeler
 }

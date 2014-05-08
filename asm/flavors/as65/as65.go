@@ -13,6 +13,7 @@ import (
 
 type AS65 struct {
 	context.SimpleContext
+	context.LabelerBase
 }
 
 func New() *AS65 {
@@ -38,4 +39,12 @@ func (a *AS65) SetWidthsOnFirstPass() bool {
 
 func (a *AS65) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
 	panic("AS65.ReplaceMacroArgs not implemented yet.")
+}
+
+func (a *AS65) IsNewParentLabel(label string) bool {
+	return label != "" && label[0] != '.'
+}
+
+func (a *AS65) FixLabel(label string, macroCall int) (string, error) {
+	panic("AS65.FixLabel not implemented yet.")
 }

@@ -12,9 +12,9 @@ type M struct {
 	Lines []string
 }
 
-func (m M) LineSource(flavor flavors.F, in inst.I) (lines.LineSource, error) {
+func (m M) LineSource(flavor flavors.F, in inst.I, macroCall int) (lines.LineSource, error) {
 	var ls []string
-	context := lines.Context{Filename: "macro:" + m.Name, Parent: in.Line}
+	context := lines.Context{Filename: "macro:" + m.Name, Parent: in.Line, MacroCall: macroCall}
 	for _, line := range m.Lines {
 		// TODO(zellyn): implement named macro args
 		subbed, err := flavor.ReplaceMacroArgs(line, in.MacroArgs, nil)

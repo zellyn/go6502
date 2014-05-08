@@ -50,11 +50,7 @@ func (a *Assembler) Load(filename string) error {
 			// we're in an inactive ifdef branch
 			continue
 		}
-		if in.Label != "" && in.Label[0] != '.' {
-			a.Flavor.SetLastLabel(in.Label)
-		}
-		in.FixLabels(a.Flavor.GetLastLabel())
-		if err != nil {
+		if err := in.FixLabels(a.Flavor); err != nil {
 			return err
 		}
 
@@ -72,11 +68,12 @@ func (a *Assembler) Load(filename string) error {
 			continue // no need to append
 			return in.Errorf("macro start not (yet) implemented: %s", line)
 		case inst.TypeMacroCall:
+			macroCall++
 			m, ok := a.Macros[in.Command]
 			if !ok {
 				return in.Errorf(`unknown macro: "%s"`, in.Command)
 			}
-			subLs, err := m.LineSource(a.Flavor, in)
+			subLs, err := m.LineSource(a.Flavor, in, macroCall)
 			if err != nil {
 				return in.Errorf(`error calling macro "%s": %v`, m.Name, err)
 			}

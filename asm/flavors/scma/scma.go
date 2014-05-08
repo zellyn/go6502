@@ -39,6 +39,7 @@ type SCMA struct {
 	directives map[string]directiveInfo
 	operators  map[string]expr.Operator
 	context.SimpleContext
+	context.LabelerBase
 }
 
 func New() *SCMA {
@@ -569,4 +570,28 @@ func (a *SCMA) ReplaceMacroArgs(line string, args []string, kwargs map[string]st
 		return []byte{}
 	}))
 	return line, nil
+}
+
+func (a *SCMA) IsNewParentLabel(label string) bool {
+	return label != "" && label[0] != '.'
+}
+
+func (a *SCMA) FixLabel(label string, macroCall int) (string, error) {
+	switch {
+	case label == "":
+		return label, nil
+	case label[0] == '.':
+		if last := a.LastLabel(); last == "" {
+			return "", fmt.Errorf("sublabel '%s' without previous label", label)
+		} else {
+			return fmt.Sprintf("%s/%s", last, label), nil
+		}
+	case label[0] == ':':
+		if macroCall == 0 {
+			return "", fmt.Errorf("macro-local label '%s' seen outside macro", label)
+		} else {
+			return fmt.Sprintf("%s/%d", label, macroCall), nil
+		}
+	}
+	return label, nil
 }
