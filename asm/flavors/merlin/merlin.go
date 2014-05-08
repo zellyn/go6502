@@ -36,3 +36,7 @@ func (a *Merlin) DefaultOrigin() (uint16, error) {
 func (a *Merlin) SetWidthsOnFirstPass() bool {
 	panic("don't know yet")
 }
+
+func (a *Merlin) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
+	panic("Merlin.ReplaceMacroArgs not implemented yet.")
+}

@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/zellyn/go6502/asm"
+	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/flavors/as65"
 	"github.com/zellyn/go6502/asm/flavors/merlin"
 	"github.com/zellyn/go6502/asm/flavors/scma"
@@ -17,10 +17,10 @@ func TestSimpleCommonFunctions(t *testing.T) {
 	mm := merlin.New()
 
 	tests := []struct {
-		a asm.Flavor // assembler flavor
-		i string     // input string
-		p string     // printed instruction, expected
-		b string     // bytes, expected
+		a flavors.F // assembler flavor
+		i string    // input string
+		p string    // printed instruction, expected
+		b string    // bytes, expected
 	}{
 		{ss, "* Comment", "{-}", ""},
 		{ss, "* Comment", "{-}", ""},
@@ -114,7 +114,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " .DO A<$3", "{if (< A $0003)}", ""},
 		{ss, " .ELSE", "{else}", ""},
 		{ss, " .FIN", "{endif}", ""},
-		{ss, "Label .MA", "{macro 'Label'}", ""},
+		{ss, " .MA MacroName", "{macro 'MacroName'}", ""},
 		{ss, " .EM", "{endm}", ""},
 		{ss, " .EN", "{end}", ""},
 		{ss, `>SAM AB,$12,"A B","A, B, "" C"`,
@@ -172,8 +172,8 @@ func TestSimpleErrors(t *testing.T) {
 	mm := merlin.New()
 
 	tests := []struct {
-		a asm.Flavor // assembler flavor
-		i string     // input string
+		a flavors.F // assembler flavor
+		i string    // input string
 	}{
 
 		{ss, " LDA"},            // missing arg

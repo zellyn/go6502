@@ -10,6 +10,7 @@ TODO(zellyn): make errors return line and character position.
 TODO(zellyn): scma requires .EQ and .BS to have known values. Is this universal?
 TODO(zellyn): make lineparse have a line, rather than the reverse.
 TODO(zellyn): implement ca65 and compile ehbasic
+TODO(zellyn): implement named macro args
 
 */
 package asm

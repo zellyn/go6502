@@ -30,7 +30,7 @@ func TestMultiline(t *testing.T) {
 		{ss, "Unknown label: wide", []string{
 			"L1 LDA L2-L1",
 			"L2 NOP",
-		}, nil, "ad0300ea", false},
+		}, nil, "ad0300ea", true},
 
 		// sc-asm sets instruction widths on the first pass
 		{ss, "Later label: wide", []string{
@@ -46,7 +46,7 @@ func TestMultiline(t *testing.T) {
 			"L2 BEQ .2",
 			".1 NOP",
 			".2 NOP",
-		}, nil, "f000eaf001eaea", false},
+		}, nil, "f000eaf001eaea", true},
 
 		// Includes: one level deep
 		{ss, "Include A", []string{
@@ -57,7 +57,7 @@ func TestMultiline(t *testing.T) {
 			"SUBFILE1": {
 				" LDA #$2a",
 			},
-		}, "f002a92aea", false},
+		}, "f002a92aea", true},
 
 		// Ifdefs: simple at first
 		{ss, "Ifdef A", []string{
@@ -134,6 +134,63 @@ func TestMultiline(t *testing.T) {
 			" .FIN",
 			" NOP",
 		}, nil, "a901a903ea", true},
+
+		// Macro, simple
+		{ss, "Macro, simple", []string{
+			"       .MA INCD    MACRO NAME",
+			"       INC ]1      CALL PARAMETER",
+			"       BNE :1      PRIVATE LABEL",
+			"       INC ]1+l",
+			":1",
+			"       .EM         END OF DEFINITION",
+			"       >INCD PTR",
+			"PTR .HS 0000",
+			"ZPTR .EQ $42",
+			"       >INCD ZPTR",
+		}, nil, "", true},
+
+		// Macro, conditional assembly
+		{ss, "Macro, conditional assembly", []string{
+			" *--------------------------------",
+			" *      DEMONSTRATE CONDITIONAL ASSEMBLY IN",
+			" *--------------------------------   MACRO",
+			"        .MA INCD",
+			"        .DO ]#=2",
+			"        INC ]1,]2",
+			"        BNE :3",
+			"        INC ]1+1,]2",
+			":3",
+			"        .ELSE",
+			"        INC ]1",
+			"        BNE :3",
+			"        INC ]1+1",
+			":3",
+			"        .FIN",
+			"        .EM",
+			" *--------------------------------",
+			"         >INCD $12",
+			"         >INCD $1234",
+			"         >INCD $12,X",
+			"         >INCD $1234,X",
+		}, nil, "e612d002e613ee3412d003ee3512f612d002f613fe3412d003fe3512", true},
+
+		// Macros, nested
+		{ss, "Macros, nested", []string{
+			"        .MA CALL",
+			"        JSR ]1",
+			"        .DO ]#>1",
+			"        JSR ]2",
+			"        .FIN",
+			"        .DO ]#>2",
+			"        JSR ]3",
+			"        .FIN",
+			"        .EM",
+			"        >CALL SAM,TOM,JOE",
+			"        >CALL SAM,TOM",
+			"SAM    RTS",
+			"JOE    RTS",
+			"TOM    RTS",
+		}, nil, "200f08201108201008200f08201108606060", true},
 	}
 
 	for i, tt := range tests {
@@ -150,9 +207,11 @@ func TestMultiline(t *testing.T) {
 			t.Errorf(`%d("%s"): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, err)
 			continue
 		}
-		if _, err := tt.a.Pass(true, false); err != nil {
-			t.Errorf(`%d("%s"): tt.a.Pass(true, false) failed: %s`, i, tt.name, err)
-			continue
+		if !tt.a.Flavor.SetWidthsOnFirstPass() {
+			if _, err := tt.a.Pass(true, false); err != nil {
+				t.Errorf(`%d("%s"): tt.a.Pass(true, false) failed: %s`, i, tt.name, err)
+				continue
+			}
 		}
 		isFinal, err := tt.a.Pass(true, true)
 		if err != nil {
@@ -177,7 +236,7 @@ func TestMultiline(t *testing.T) {
 }
 
 func TestApplesoftBasic(t *testing.T) {
-	if err := os.Chdir("../../../goapple2/source/applesoft"); err != nil {
+	if err := os.Chdir("../../../../goapple2/source/applesoft"); err != nil {
 		t.Fatal(err)
 	}
 	var o lines.OsOpener

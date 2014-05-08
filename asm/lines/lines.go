@@ -3,8 +3,9 @@ package lines
 import "fmt"
 
 type Context struct {
-	Filename string // Pointer to the filename
-	Parent   *Line  // Pointer to parent line (eg. include, macro)
+	Filename  string // Pointer to the filename
+	Parent    *Line  // Pointer to parent line (eg. include, macro)
+	MacroCall int
 }
 
 type Line struct {
@@ -34,6 +35,16 @@ func NewSimple(s string) Line {
 	return NewLine(s, 0, &Context{Filename: testFilename})
 }
 
+func (c Context) GetMacroCall() int {
+	if c.MacroCall > 0 {
+		return c.MacroCall
+	}
+	if c.Parent == nil || c.Parent.Context == nil {
+		return 0
+	}
+	return c.Parent.Context.GetMacroCall()
+}
+
 func (l Line) Text() string {
 	return l.Parse.Text()
 }
@@ -56,4 +67,30 @@ func (l Line) Sprintf(format string, a ...interface{}) string {
 		filename = l.Context.Filename
 	}
 	return fmt.Sprintf(fmt.Sprintf("%s:%d: %s", filename, l.LineNo, format), a...)
+}
+
+type SimpleLineSource struct {
+	context Context
+	lines   []string
+	size    int
+	curr    int
+}
+
+func (sls *SimpleLineSource) Next() (line Line, done bool, err error) {
+	if sls.curr >= sls.size {
+		return Line{}, true, nil
+	}
+	sls.curr++
+	return NewLine(sls.lines[sls.curr-1], sls.curr, &sls.context), false, nil
+}
+
+func (sls SimpleLineSource) Context() Context {
+	return sls.context
+}
+func NewSimpleLineSource(context Context, ls []string) LineSource {
+	return &SimpleLineSource{
+		context: context,
+		lines:   ls,
+		size:    len(ls),
+	}
 }

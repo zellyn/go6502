@@ -19,27 +19,8 @@ func (o OsOpener) Open(filename string) (io.ReadCloser, error) {
 	return os.Open(filename)
 }
 
-type FileLineSource struct {
-	context Context
-	lines   []string
-	size    int
-	curr    int
-}
-
-func (fls *FileLineSource) Next() (line Line, done bool, err error) {
-	if fls.curr >= fls.size {
-		return Line{}, true, nil
-	}
-	fls.curr++
-	return NewLine(fls.lines[fls.curr-1], fls.curr, &fls.context), false, nil
-}
-
-func (fls FileLineSource) Context() Context {
-	return fls.context
-}
-
 func NewFileLineSource(filename string, context Context, opener Opener) (LineSource, error) {
-	fls := &FileLineSource{context: context}
+	var ls []string
 	file, err := opener.Open(filename)
 	if err != nil {
 		return nil, err
@@ -47,15 +28,14 @@ func NewFileLineSource(filename string, context Context, opener Opener) (LineSou
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		fls.lines = append(fls.lines, scanner.Text())
+		ls = append(ls, scanner.Text())
 	}
 
 	if err = scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	fls.size = len(fls.lines)
-	return fls, nil
+	return NewSimpleLineSource(context, ls), nil
 }
 
 type TestOpener map[string]string

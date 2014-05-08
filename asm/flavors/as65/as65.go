@@ -35,3 +35,7 @@ func (a *AS65) DefaultOrigin() (uint16, error) {
 func (a *AS65) SetWidthsOnFirstPass() bool {
 	return false
 }
+
+func (a *AS65) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
+	panic("AS65.ReplaceMacroArgs not implemented yet.")
+}

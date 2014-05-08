@@ -3,31 +3,31 @@ package asm
 import (
 	"fmt"
 
-	"github.com/zellyn/go6502/asm/context"
+	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/asm/macros"
 )
 
-type Flavor interface {
-	ParseInstr(Line lines.Line) (inst.I, error)
-	DefaultOrigin() (uint16, error)
-	SetWidthsOnFirstPass() bool
-	context.Context
-}
-
 type Assembler struct {
-	Flavor    Flavor
+	Flavor    flavors.F
 	Opener    lines.Opener
 	Insts     []*inst.I
 	LastLabel string
+	Macros    map[string]macros.M
 }
 
-func NewAssembler(flavor Flavor, opener lines.Opener) *Assembler {
-	return &Assembler{Flavor: flavor, Opener: opener}
+func NewAssembler(flavor flavors.F, opener lines.Opener) *Assembler {
+	return &Assembler{
+		Flavor: flavor,
+		Opener: opener,
+		Macros: make(map[string]macros.M),
+	}
 }
 
 // Load loads a new assembler file, deleting any previous data.
 func (a *Assembler) Load(filename string) error {
+	a.initPass()
 	context := lines.Context{Filename: filename}
 	ls, err := lines.NewFileLineSource(filename, context, a.Opener)
 	if err != nil {
@@ -35,6 +35,7 @@ func (a *Assembler) Load(filename string) error {
 	}
 	lineSources := []lines.LineSource{ls}
 	ifdefs := []bool{}
+	macroCall := 0
 	for len(lineSources) > 0 {
 		line, done, err := lineSources[0].Next()
 		if err != nil {
@@ -65,9 +66,22 @@ func (a *Assembler) Load(filename string) error {
 		case inst.TypeUnknown:
 			return in.Errorf("unknown instruction: %s", line)
 		case inst.TypeMacroStart:
+			if err := a.readMacro(in, lineSources[0]); err != nil {
+				return err
+			}
+			continue // no need to append
 			return in.Errorf("macro start not (yet) implemented: %s", line)
 		case inst.TypeMacroCall:
-			return in.Errorf("macro call not (yet) implemented: %s", line)
+			m, ok := a.Macros[in.Command]
+			if !ok {
+				return in.Errorf(`unknown macro: "%s"`, in.Command)
+			}
+			subLs, err := m.LineSource(a.Flavor, in)
+			if err != nil {
+				return in.Errorf(`error calling macro "%s": %v`, m.Name, err)
+			}
+			lineSources = append([]lines.LineSource{subLs}, lineSources...)
+			continue // no need to append
 		case inst.TypeIfdef:
 			if len(in.Exprs) == 0 {
 				panic(fmt.Sprintf("Ifdef got parsed with no expression: %s", line))
@@ -107,6 +121,28 @@ func (a *Assembler) Load(filename string) error {
 		a.Insts = append(a.Insts, &in)
 	}
 	return nil
+}
+
+func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
+	m := macros.M{
+		Name: in.TextArg,
+		Args: in.MacroArgs,
+	}
+	for {
+		line, done, err := ls.Next()
+		if err != nil {
+			return in.Errorf("error while reading macro %s: %v", m.Name)
+		}
+		if done {
+			return in.Errorf("end of file while reading macro %s", m.Name)
+		}
+		in2, err := a.Flavor.ParseInstr(line)
+		if err == nil && in2.Type == inst.TypeMacroEnd {
+			a.Macros[m.Name] = m
+			return nil
+		}
+		m.Lines = append(m.Lines, line.Parse.Text())
+	}
 }
 
 // Clear out stuff that may be hanging around from the previous pass, set origin to default, etc.

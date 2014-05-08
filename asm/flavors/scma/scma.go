@@ -3,6 +3,7 @@ package scma
 import (
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,7 @@ const hexdigits = digits + "abcdefABCDEF"
 const labelChars = letters + digits + ".:"
 const whitespace = " \t"
 const cmdChars = letters + "."
+const macroNameChars = letters + digits + "._"
 const fileChars = letters + digits + "."
 const operatorChars = "+-*/<>="
 
@@ -59,7 +61,7 @@ func New() *SCMA {
 		".DO":   {inst.TypeIfdef, s.parseDo},
 		".ELSE": {inst.TypeIfdefElse, s.parseNoArgDir},
 		".FIN":  {inst.TypeIfdefEnd, s.parseNoArgDir},
-		".MA":   {inst.TypeMacroStart, s.parseNoArgDir},
+		".MA":   {inst.TypeMacroStart, s.parseMacroStart},
 		".EM":   {inst.TypeMacroEnd, s.parseNoArgDir},
 		".US":   {inst.TypeNone, s.parseNotImplemented},
 	}
@@ -160,14 +162,14 @@ func (a *SCMA) parseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 		in.Type = inst.TypeOp
 		return a.parseOpArgs(in, lp, summary)
 	}
-	return inst.I{}, in.Errorf(`not implemented: "%s": `, in.Command, in.Line)
+	return inst.I{}, in.Errorf(`unknown command/instruction: "%s": `, in.Command, in.Line)
 }
 
 // parseMacroCall parses a macro call. We expect to be looking at a the
 // first character of the macro name.
 func (a *SCMA) parseMacroCall(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Type = inst.TypeMacroCall
-	if !lp.AcceptRun(cmdChars) {
+	if !lp.AcceptRun(macroNameChars) {
 		c := lp.Next()
 		return inst.I{}, in.Errorf("expecting macro name, found '%c' (%d)", c, c)
 	}
@@ -431,6 +433,19 @@ func (a *SCMA) parseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
+func (a *SCMA) parseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
+	lp.IgnoreRun(whitespace)
+	if !lp.AcceptRun(macroNameChars) {
+		return inst.I{}, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
+	}
+	in.TextArg = lp.Emit()
+	in.WidthKnown = true
+	in.MinWidth = 0
+	in.MaxWidth = 0
+	in.Final = true
+	return in, nil
+}
+
 func (a *SCMA) parseNoArgDir(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.WidthKnown = true
 	in.MinWidth = 0
@@ -540,4 +555,18 @@ func (a *SCMA) parseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 	ex.Op = expr.OpLeaf
 	ex.Text = lp.Emit()
 	return top, nil
+}
+
+var macroArgRe = regexp.MustCompile("][0-9]+")
+
+func (a *SCMA) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
+	line = strings.Replace(line, "]#", strconv.Itoa(len(args)), -1)
+	line = string(macroArgRe.ReplaceAllFunc([]byte(line), func(in []byte) []byte {
+		n, _ := strconv.Atoi(string(in[1:]))
+		if n > 0 && n <= len(args) {
+			return []byte(args[n-1])
+		}
+		return []byte{}
+	}))
+	return line, nil
 }
