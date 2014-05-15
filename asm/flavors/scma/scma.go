@@ -543,6 +543,7 @@ func (a *SCMA) parseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 		}
 		ex.Op = expr.OpLeaf
 		ex.Val = uint16(c)
+		lp.Consume("'") // optional closing quote
 		lp.Ignore()
 		return top, nil
 	}

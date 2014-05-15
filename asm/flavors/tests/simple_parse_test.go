@@ -120,6 +120,8 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, `>SAM AB,$12,"A B","A, B, "" C"`,
 			`{call SAM {"AB", "$12", "A B", "A, B, \" C"}}`, ""},
 		{ss, " LDX #']+$80", "{LDX/imm (lsb (+ $005d $0080))}", "a2dd"},
+
+		{ss, " CMP #';'+1", "{CMP/imm (lsb (+ $003b $0001))}", "c93c"},
 	}
 
 	// TODO(zellyn): Add tests for finalization of four SCMA directives:

@@ -78,7 +78,6 @@ func (a *Assembler) Load(filename string) error {
 				return in.Errorf(`error calling macro "%s": %v`, m.Name, err)
 			}
 			lineSources = append([]lines.LineSource{subLs}, lineSources...)
-			continue // no need to append
 		case inst.TypeIfdef:
 			if len(in.Exprs) == 0 {
 				panic(fmt.Sprintf("Ifdef got parsed with no expression: %s", line))
@@ -106,7 +105,6 @@ func (a *Assembler) Load(filename string) error {
 				return in.Errorf("error including file: %v", err)
 			}
 			lineSources = append([]lines.LineSource{subLs}, lineSources...)
-			continue // no need to append
 		case inst.TypeTarget:
 			return in.Errorf("target not (yet) implemented: %s", line)
 		case inst.TypeSegment:
