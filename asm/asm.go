@@ -60,7 +60,7 @@ func (a *Assembler) Load(filename string) error {
 
 		switch in.Type {
 		case inst.TypeUnknown:
-			return in.Errorf("unknown instruction: %s", line)
+			return line.Errorf("unknown instruction: %s", line.Parse.Text())
 		case inst.TypeMacroStart:
 			if err := a.readMacro(in, lineSources[0]); err != nil {
 				return err
