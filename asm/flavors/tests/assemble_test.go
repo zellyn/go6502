@@ -2,7 +2,6 @@ package flavors
 
 import (
 	"encoding/hex"
-	"os"
 	"strings"
 	"testing"
 
@@ -233,33 +232,4 @@ func TestMultiline(t *testing.T) {
 			continue
 		}
 	}
-}
-
-func TestApplesoftBasic(t *testing.T) {
-	if err := os.Chdir("../../../../goapple2/source/applesoft"); err != nil {
-		t.Fatal(err)
-	}
-	var o lines.OsOpener
-
-	ss := asm.NewAssembler(scma.New(), o)
-	ss.Reset()
-
-	if err := ss.Load("S.ACF"); err != nil {
-		t.Fatalf(`ss.Load("S.ACF") failed: %s`, err)
-	}
-	if _, err := ss.Pass(true, false); err != nil {
-		t.Fatalf(`ss.Pass(true, false) failed: %s`, err)
-	}
-	isFinal, err := ss.Pass(true, true)
-	if err != nil {
-		t.Fatalf(`ss.Pass(true, true) failed: %s`, err)
-	}
-	if !isFinal {
-		t.Fatalf(`ss.Pass(true, true) couldn't finalize`)
-	}
-	bb, err := ss.RawBytes()
-	if err != nil {
-		t.Fatalf(`ss.RawBytes() failed: %s`, err)
-	}
-	_ = bb
 }
