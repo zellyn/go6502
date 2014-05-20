@@ -54,6 +54,8 @@ type I struct {
 	Value        uint16                 // For Equates, the value
 	DeclaredLine uint16
 	Line         *lines.Line
+	Addr         uint16
+	AddrKnown    bool
 }
 
 func (i I) TypeString() string {

@@ -2,11 +2,13 @@ package asm
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/asm/macros"
+	"github.com/zellyn/go6502/asm/membuf"
 )
 
 type Assembler struct {
@@ -99,8 +101,9 @@ func (a *Assembler) Load(filename string) error {
 			}
 			ifdefs = ifdefs[1:]
 		case inst.TypeInclude:
-			subContext := lines.Context{Filename: in.TextArg, Parent: in.Line}
-			subLs, err := lines.NewFileLineSource(in.TextArg, subContext, a.Opener)
+			filename = filepath.Join(filepath.Dir(in.Line.Context.Filename), in.TextArg)
+			subContext := lines.Context{Filename: filename, Parent: in.Line}
+			subLs, err := lines.NewFileLineSource(filename, subContext, a.Opener)
 			if err != nil {
 				return in.Errorf("error including file: %v", err)
 			}
@@ -114,6 +117,26 @@ func (a *Assembler) Load(filename string) error {
 		default:
 		}
 		a.Insts = append(a.Insts, &in)
+	}
+	return nil
+}
+
+func (a *Assembler) Assemble(filename string) error {
+	a.Reset()
+	if err := a.Load(filename); err != nil {
+		return err
+	}
+
+	// Setwidth pass if necessary.
+	if !a.Flavor.SetWidthsOnFirstPass() {
+		if _, err := a.Pass(true, false); err != nil {
+			return err
+		}
+	}
+
+	// Final pass.
+	if _, err := a.Pass(true, true); err != nil {
+		return err
 	}
 	return nil
 }
@@ -168,11 +191,15 @@ func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, er
 		panic(fmt.Sprintf("inst.I %s: WidthKnown=true, but MinWidth=%d, MaxWidth=%d", in, in.MinWidth, in.MaxWidth))
 	}
 
-	if in.WidthKnown && a.Flavor.AddrKnown() {
+	// Update address
+	if a.Flavor.AddrKnown() {
 		addr, _ := a.Flavor.GetAddr()
-		a.Flavor.SetAddr(addr + in.MinWidth)
-	} else {
-		if a.Flavor.AddrKnown() {
+		in.Addr = addr
+		in.AddrKnown = true
+
+		if in.WidthKnown {
+			a.Flavor.SetAddr(addr + in.MinWidth)
+		} else {
 			a.Flavor.ClearAddr(in.Sprintf("lost known address"))
 		}
 	}
@@ -221,4 +248,20 @@ func (a *Assembler) RawBytes() ([]byte, error) {
 func (a *Assembler) Reset() {
 	a.Insts = nil
 	a.LastLabel = ""
+}
+
+func (a *Assembler) Membuf() (*membuf.Membuf, error) {
+	m := &membuf.Membuf{}
+	for _, in := range a.Insts {
+		if !in.Final {
+			return nil, in.Errorf("cannot finalize value: %s", in)
+		}
+		if !in.AddrKnown {
+			return nil, in.Errorf("address unknown: %s", in)
+		}
+		if in.MinWidth > 0 {
+			m.Write(int(in.Addr), in.Data)
+		}
+	}
+	return m, nil
 }
