@@ -5,6 +5,7 @@ import (
 
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
+	"github.com/zellyn/go6502/asm/lines"
 )
 
 func TestComputeLabel(t *testing.T) {
@@ -33,6 +34,7 @@ func TestWidthDoesNotChange(t *testing.T) {
 		Mode:     0x2,
 		ZeroMode: 0x80,
 		ZeroOp:   0xa5,
+		Line:     &lines.Line{},
 	}
 	c := &context.SimpleContext{}
 	c.Set("L1", 0x102)
