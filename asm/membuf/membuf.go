@@ -9,7 +9,7 @@ type Membuf struct {
 }
 
 type Piece struct {
-	Addr int
+	Addr uint32
 	Data []byte
 }
 
@@ -51,7 +51,7 @@ func (m *Membuf) Pieces() []Piece {
 			}
 		} else {
 			if p == nil {
-				p = &Piece{Addr: a}
+				p = &Piece{Addr: uint32(a)}
 			}
 			p.Data = append(p.Data, byte(d-1))
 		}
@@ -73,7 +73,7 @@ func (m *Membuf) Piece(fill byte) Piece {
 		} else {
 			if !started {
 				started = true
-				p.Addr = a
+				p.Addr = uint32(a)
 			}
 			p.Data = append(p.Data, byte(d-1))
 		}

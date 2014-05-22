@@ -232,8 +232,9 @@ func (a *Assembler) Pass(setWidth, final bool) (isFinal bool, err error) {
 	return isFinal, nil
 }
 
-// RawBytes returns the raw bytes, sequentially. Intended for testing,
-// the return value gives no indication of address changes.
+// RawBytes returns the raw bytes, sequentially in the order of the
+// lines of the file. Intended for testing, the return value gives no
+// indication of address changes.
 func (a *Assembler) RawBytes() ([]byte, error) {
 	result := []byte{}
 	for _, in := range a.Insts {
