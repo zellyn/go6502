@@ -7,12 +7,14 @@ import (
 	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/flavors/as65"
 	"github.com/zellyn/go6502/asm/flavors/merlin"
+	"github.com/zellyn/go6502/asm/flavors/redbook"
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/lines"
 )
 
 func TestSimpleCommonFunctions(t *testing.T) {
 	ss := scma.New()
+	rb := redbook.New()
 	aa := as65.New()
 	mm := merlin.New()
 
@@ -23,11 +25,13 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		b string    // bytes, expected
 	}{
 		{ss, "* Comment", "{-}", ""},
-		{ss, "* Comment", "{-}", ""},
+		{rb, "* Comment", "{-}", ""},
 		{aa, "; Comment", "{-}", ""},
 		{mm, "* Comment", "{-}", ""},
 		{ss, "                                        far-out-comment", "{-}", ""},
 		{ss, "Label", "{- 'Label'}", ""},
+		{rb, "Label", "{- 'Label'}", ""},
+		{rb, "Label:", "{- 'Label'}", ""},
 		{aa, "Label", "{- 'Label'}", ""},
 		{mm, "Label", "{- 'Label'}", ""},
 		{ss, " .IN FILE.NAME", "{inc 'FILE.NAME'}", ""},
@@ -35,12 +39,14 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{aa, ` include "FILE.NAME"`, "{inc 'FILE.NAME'}", ""},
 		{mm, " PUT !FILE.NAME", "{inc 'FILE.NAME'}", ""},
 		{ss, " .TI 76,Title here", "{-}", ""},
+		{rb, ` SBTL Title here`, "{-}", ""},
 		{aa, ` title "Title here"`, "{-}", ""},
 		{mm, ` TTL "Title here"`, "{-}", ""},
 		{ss, " .TF OUT.BIN", "{-}", ""},
 		{mm, " DSK OUTFILE", "{-}", ""},
 		{mm, " SAV OUTFILE", "{-}", ""},
 		{ss, " .OR $D000", "{org $d000}", ""},
+		{rb, " ORG $D000", "{org $d000}", ""},
 		{aa, " org $D000", "{org $d000}", ""},
 		{mm, " ORG $D000", "{org $d000}", ""},
 		// {ss, " .TA *-1234", "{target (- * $04d2)}", ""},
@@ -50,6 +56,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " .DA/$1234,#$1234,$1234", "{data (msb $1234),(lsb $1234),$1234}", "12343412"},
 		{ss, " ROL", "{ROL/a}", "2a"},
 		{aa, " rol a", "{ROL/a}", "2a"},
+		{rb, " ROL A", "{ROL/a}", "2a"},
 		{mm, " ROL", "{ROL/a}", "2a"},
 		{ss, " ROL  Comment after two spaces", "{ROL/a}", "2a"},
 		{ss, " ROL $1234", "{ROL/abs $1234}", "2e3412"},
@@ -131,7 +138,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 
 	for i, tt := range tests {
 		// TODO(zellyn): Test AS65 and Merlin too.
-		if tt.a != ss {
+		if tt.a != ss && tt.a != rb {
 			continue
 		}
 

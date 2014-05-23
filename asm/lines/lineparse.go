@@ -57,6 +57,9 @@ func (lp *Parse) Peek() rune {
 }
 
 func (lp *Parse) Accept(valid string) bool {
+	if len(valid) == 0 {
+		panic(`valid = ""`)
+	}
 	if strings.IndexRune(valid, lp.Next()) >= 0 {
 		return true
 	}
@@ -66,6 +69,9 @@ func (lp *Parse) Accept(valid string) bool {
 
 // Consume accepts and ignores a single character of input.
 func (lp *Parse) Consume(valid string) bool {
+	if len(valid) == 0 {
+		panic(`valid = ""`)
+	}
 	if strings.IndexRune(valid, lp.Next()) >= 0 {
 		lp.start = lp.pos
 		return true
@@ -75,6 +81,9 @@ func (lp *Parse) Consume(valid string) bool {
 }
 
 func (lp *Parse) AcceptRun(valid string) bool {
+	if len(valid) == 0 {
+		panic(`valid = ""`)
+	}
 	some := false
 	for strings.IndexRune(valid, lp.Next()) >= 0 {
 		some = true
@@ -94,6 +103,9 @@ func (lp *Parse) AcceptUntil(until string) bool {
 }
 
 func (lp *Parse) IgnoreRun(valid string) bool {
+	if len(valid) == 0 {
+		panic(`valid = ""`)
+	}
 	if lp.AcceptRun(valid) {
 		lp.Ignore()
 		return true
@@ -102,6 +114,9 @@ func (lp *Parse) IgnoreRun(valid string) bool {
 }
 
 func (lp *Parse) AcceptString(prefix string) bool {
+	if len(prefix) == 0 {
+		panic(`prefix = ""`)
+	}
 	if strings.HasPrefix(lp.line[lp.pos:], prefix) {
 		lp.pos += len(prefix)
 		return true

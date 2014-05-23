@@ -8,6 +8,7 @@ import (
 
 	"github.com/zellyn/go6502/asm"
 	"github.com/zellyn/go6502/asm/flavors"
+	"github.com/zellyn/go6502/asm/flavors/redbook"
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/ihex"
 	"github.com/zellyn/go6502/asm/lines"
@@ -18,7 +19,8 @@ var flavor string
 
 func init() {
 	flavorsByName = map[string]flavors.F{
-		"scma": scma.New(),
+		"scma":    scma.New(),
+		"redbook": redbook.New(),
 	}
 	var names []string
 	for name := range flavorsByName {

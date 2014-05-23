@@ -61,3 +61,10 @@ https://github.com/Klaus2m5/6502_65C02_functional_tests/blob/master/6502_functio
     .MA -- Macro Definition                     5-11
     .EM -- End of Macro                         5-11
 
+
+* Edasm notes
+http://mirrors.apple2.org.za/ftp.apple.asimov.net/images/programming/assembler/EDASM.DSK
+
+** How to run
+Boot from the disk
+type "- edasm.system"

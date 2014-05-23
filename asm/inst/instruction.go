@@ -26,6 +26,8 @@ const (
 	TypeIfdefEnd   // Ifdef end
 	TypeInclude    // Include a file
 	TypeData       // Data: hex, ascii, etc., etc.
+	TypeDataBytes  // Data: expressions, but forced to one byte per
+	TypeDataWords  // Data: expressions, but forced to one word per
 	TypeBlock      // Block storage
 	TypeOrg        // Where to store assembled code
 	TypeTarget     // Target address to use for jumps, labels, etc.
