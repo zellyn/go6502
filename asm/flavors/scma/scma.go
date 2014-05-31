@@ -1,10 +1,16 @@
 package scma
 
 import (
+	"strings"
+
 	"github.com/zellyn/go6502/asm/expr"
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
+	"github.com/zellyn/go6502/asm/lines"
 )
+
+// 40 spaces = comment column
+const commentWhitespacePrefix = "                                        "
 
 // SCMA implements the S-C Macro Assembler-compatible assembler flavor.
 // See http://www.txbobsc.com/scsc/ and http://stjarnhimlen.se/apple2/
@@ -17,28 +23,29 @@ func New() *SCMA {
 	a.LabelChars = oldschool.Letters + oldschool.Digits + ".:"
 	a.LabelColons = oldschool.ReqDisallowed
 	a.ExplicitARegister = oldschool.ReqDisallowed
+	a.TwoSpacesIsComment = true
 
 	a.Directives = map[string]oldschool.DirectiveInfo{
-		".IN":   {inst.TypeInclude, a.ParseInclude},
-		".OR":   {inst.TypeOrg, a.ParseAddress},
-		".TA":   {inst.TypeTarget, a.ParseNotImplemented},
-		".TF":   {inst.TypeNone, nil},
-		".EN":   {inst.TypeEnd, a.ParseNoArgDir},
-		".EQ":   {inst.TypeEqu, a.ParseEquate},
-		".DA":   {inst.TypeData, a.ParseData},
-		".HS":   {inst.TypeData, a.ParseHexString},
-		".AS":   {inst.TypeData, a.ParseAscii},
-		".AT":   {inst.TypeData, a.ParseAscii},
-		".BS":   {inst.TypeBlock, a.ParseBlockStorage},
-		".TI":   {inst.TypeNone, nil},
-		".LIST": {inst.TypeNone, nil},
-		".PG":   {inst.TypeNone, nil},
-		".DO":   {inst.TypeIfdef, a.ParseDo},
-		".ELSE": {inst.TypeIfdefElse, a.ParseNoArgDir},
-		".FIN":  {inst.TypeIfdefEnd, a.ParseNoArgDir},
-		".MA":   {inst.TypeMacroStart, a.ParseMacroStart},
-		".EM":   {inst.TypeMacroEnd, a.ParseNoArgDir},
-		".US":   {inst.TypeNone, a.ParseNotImplemented},
+		".IN":   {inst.TypeInclude, a.ParseInclude, 0},
+		".OR":   {inst.TypeOrg, a.ParseAddress, 0},
+		".TA":   {inst.TypeTarget, a.ParseNotImplemented, 0},
+		".TF":   {inst.TypeNone, nil, 0},
+		".EN":   {inst.TypeEnd, a.ParseNoArgDir, 0},
+		".EQ":   {inst.TypeEqu, a.ParseEquate, 0},
+		".DA":   {inst.TypeData, a.ParseData, inst.DataMixed},
+		".HS":   {inst.TypeData, a.ParseHexString, inst.DataBytes},
+		".AS":   {inst.TypeData, a.ParseAscii, inst.DataBytes},
+		".AT":   {inst.TypeData, a.ParseAscii, inst.DataBytes},
+		".BS":   {inst.TypeBlock, a.ParseBlockStorage, 0},
+		".TI":   {inst.TypeNone, nil, 0},
+		".LIST": {inst.TypeNone, nil, 0},
+		".PG":   {inst.TypeNone, nil, 0},
+		".DO":   {inst.TypeIfdef, a.ParseDo, 0},
+		".ELSE": {inst.TypeIfdefElse, a.ParseNoArgDir, 0},
+		".FIN":  {inst.TypeIfdefEnd, a.ParseNoArgDir, 0},
+		".MA":   {inst.TypeMacroStart, a.ParseMacroStart, 0},
+		".EM":   {inst.TypeMacroEnd, a.ParseNoArgDir, 0},
+		".US":   {inst.TypeNone, a.ParseNotImplemented, 0},
 	}
 	a.Operators = map[string]expr.Operator{
 		"*": expr.OpMul,
@@ -48,6 +55,27 @@ func New() *SCMA {
 		"<": expr.OpLt,
 		">": expr.OpGt,
 		"=": expr.OpEq,
+	}
+
+	a.ExtraCommenty = func(s string) bool {
+		//Comment by virtue of long whitespace prefix
+		return strings.HasPrefix(s, commentWhitespacePrefix)
+	}
+
+	a.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
+		// For S-C Assembler, leading "-" flips high bit
+		invert := lp.Consume("-")
+		invertLast := in.Command == ".AT"
+		switch {
+		case !invert && !invertLast:
+			in.Var = inst.DataAscii
+		case !invert && invertLast:
+			in.Var = inst.DataAsciiFlip
+		case invert && !invertLast:
+			in.Var = inst.DataAsciiHi
+		case invert && invertLast:
+			in.Var = inst.DataAsciiHiFlip
+		}
 	}
 
 	return a

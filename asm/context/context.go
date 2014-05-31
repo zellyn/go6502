@@ -20,6 +20,7 @@ type SimpleContext struct {
 	addr      int32
 	lastLabel string
 	clearMesg string // Saved message describing why Addr was cleared.
+	highbit   byte   // OR-mask for ASCII high bit
 }
 
 type symbolValue struct {
@@ -91,4 +92,5 @@ func (sc *SimpleContext) RemoveChanged() {
 
 func (sc *SimpleContext) Clear() {
 	sc.symbols = make(map[string]symbolValue)
+	sc.highbit = 0x00
 }

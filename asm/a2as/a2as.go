@@ -33,6 +33,7 @@ func init() {
 
 var infile = flag.String("in", "", "input file")
 var outfile = flag.String("out", "", "output file")
+var listfile = flag.String("listing", "", "listing file")
 var format = flag.String("format", "binary", "output format: binary/ihex")
 var fill = flag.Uint("fillbyte", 0x00, "byte value to use when filling gaps between assmebler output regions")
 
@@ -118,4 +119,26 @@ func main() {
 		fmt.Fprintf(os.Stderr, "format must be binary or ihex; got '%s'\n", *format)
 		os.Exit(1)
 	}
+
+	if *listfile != "" {
+		list, err := os.Create(*listfile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		defer func() {
+			err := list.Close()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+		}()
+
+		err = a.GenerateListing(list, 3)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error while generating %s: %s", *listfile, err)
+			os.Exit(1)
+		}
+	}
+
 }

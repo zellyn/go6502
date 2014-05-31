@@ -51,14 +51,20 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{mm, " ORG $D000", "{org $d000}", ""},
 		// {ss, " .TA *-1234", "{target (- * $04d2)}", ""},
 		{ss, " .DA $1234", "{data $1234}", "3412"},
-		{aa, " dw $1234", "{data $1234}", "3412"},
-		{mm, " DW $1234", "{data $1234}", "3412"},
+		{aa, " dw $1234", "{data/wle $1234}", "3412"},
+		{mm, " DW $1234", "{data/wle $1234}", "3412"},
 		{ss, " .DA/$1234,#$1234,$1234", "{data (msb $1234),(lsb $1234),$1234}", "12343412"},
+		{rb, " DFB $12", "{data/b $0012}", "12"},
+		{rb, " DFB $12,$34,$1234", "{data/b $0012,$0034,$1234}", "123434"},
+		{rb, " DW $12,$34,$1234", "{data/wle $0012,$0034,$1234}", "120034003412"},
+		{rb, " DDB $12,$34,$1234", "{data/wbe $0012,$0034,$1234}", "001200341234"},
 		{ss, " ROL", "{ROL/a}", "2a"},
 		{aa, " rol a", "{ROL/a}", "2a"},
 		{rb, " ROL A", "{ROL/a}", "2a"},
+		{rb, " ROL  A", "{ROL/a}", "2a"}, // two spaces is no big deal
 		{mm, " ROL", "{ROL/a}", "2a"},
 		{ss, " ROL  Comment after two spaces", "{ROL/a}", "2a"},
+		{ss, " ROL  X", "{ROL/a}", "2a"}, // two spaces = comment
 		{ss, " ROL $1234", "{ROL/abs $1234}", "2e3412"},
 		{aa, " rol $1234", "{ROL/abs $1234}", "2e3412"},
 		{mm, " ROL $1234", "{ROL/abs $1234}", "2e3412"},
@@ -107,17 +113,22 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " LDA ($12,X)", "{LDA/indX $0012}", "a112"},
 		{aa, " lda ($12,x)", "{LDA/indX $0012}", "a112"},
 		{mm, " LDA ($12,X)", "{LDA/indX $0012}", "a112"},
-		{ss, ` .AS "ABC"`, "{data}", "414243"},
-		{ss, ` .AT "ABC"`, "{data}", "4142c3"},
-		{ss, ` .AS /ABC/`, "{data}", "414243"},
-		{ss, ` .AT /ABC/`, "{data}", "4142c3"},
-		{ss, ` .AS -"ABC"`, "{data}", "c1c2c3"},
-		{ss, ` .AT -"ABC"`, "{data}", "c1c243"},
-		{ss, ` .AS -dABCd`, "{data}", "c1c2c3"},
-		{ss, ` .AT -dABCd`, "{data}", "c1c243"},
-		{ss, " .HS 0001ffAb", "{data}", "0001ffab"},
+		{ss, ` .AS "ABC"`, "{data/b}", "414243"},
+		{ss, ` .AT "ABC"`, "{data/b}", "4142c3"},
+		{ss, ` .AS /ABC/`, "{data/b}", "414243"},
+		{ss, ` .AT /ABC/`, "{data/b}", "4142c3"},
+		{ss, ` .AS -"ABC"`, "{data/b}", "c1c2c3"},
+		{ss, ` .AT -"ABC"`, "{data/b}", "c1c243"},
+		{ss, ` .AS -dABCd`, "{data/b}", "c1c2c3"},
+		{ss, ` .AT -dABCd`, "{data/b}", "c1c243"},
+		{rb, ` ASC "ABC"`, "{data/b}", "414243"},
+		{rb, ` ASC $ABC$ ;comment`, "{data/b}", "414243"},
+		{rb, ` ASC $ABC`, "{data/b}", "414243"},
+		{rb, ` DCI "ABC"`, "{data/b}", "4142c3"},
+		{rb, ` ASC -ABC-`, "{data/b}", "414243"},
+		{ss, " .HS 0001ffAb", "{data/b}", "0001ffab"},
 		{ss, "A.B .EQ *-C.D", "{= 'A.B' (- * C.D)}", ""},
-		{ss, " .BS $8", "{block $0008}", ""},
+		{ss, " .BS $8", "{block $0008}", "xxxxxxxxxxxxxxxx"},
 		{ss, " .DO A<$3", "{if (< A $0003)}", ""},
 		{ss, " .ELSE", "{else}", ""},
 		{ss, " .FIN", "{endif}", ""},
@@ -168,8 +179,25 @@ func TestSimpleCommonFunctions(t *testing.T) {
 
 		if tt.b != "?" {
 			hx := hex.EncodeToString(inst.Data)
-			if hx != tt.b {
-				t.Fatalf(`%d. %T.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.a, tt.i, hx, tt.b)
+			// xxxxxx sets the width, but doesn't expect actual data
+			if hx != tt.b && (len(tt.b) == 0 || tt.b[0] != 'x') {
+				t.Errorf(`%d. %T.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.a, tt.i, hx, tt.b)
+				continue
+			}
+
+			// Check length
+			w := uint16(len(tt.b) / 2)
+			if !inst.WidthKnown {
+				t.Errorf(`%d. %s.WidthKnown is false`, i, inst)
+				continue
+			}
+			if inst.MinWidth != inst.MaxWidth {
+				t.Errorf(`%d. %s: MinWidth(%d) != MaxWidth(%d)`, i, inst, inst.MinWidth, inst.MaxWidth)
+				continue
+			}
+			if inst.MinWidth != w {
+				t.Errorf(`%d. %s.MinWidth=%d; want %d`, i, inst, inst.MinWidth, w)
+				continue
 			}
 		}
 	}

@@ -24,12 +24,10 @@ const macroNameChars = Letters + Digits + "._"
 const fileChars = Letters + Digits + "."
 const operatorChars = "+-*/<>="
 
-// 40 spaces = comment column
-const comment_whitespace_prefix = "                                        "
-
 type DirectiveInfo struct {
 	Type inst.Type
 	Func func(inst.I, *lines.Parse) (inst.I, error)
+	Var  int
 }
 
 type Requiredness int
@@ -47,9 +45,13 @@ type Base struct {
 	Operators  map[string]expr.Operator
 	context.SimpleContext
 	context.LabelerBase
-	LabelChars        string
-	LabelColons       Requiredness
-	ExplicitARegister Requiredness
+	LabelChars         string
+	LabelColons        Requiredness
+	ExplicitARegister  Requiredness
+	ExtraCommenty      func(string) bool
+	TwoSpacesIsComment bool // two spaces after command means comment field?
+	StringEndOptional  bool // can omit closing delimeter from string args?
+	SetAsciiVariation  func(*inst.I, *lines.Parse)
 }
 
 // Parse an entire instruction, or return an appropriate error.
@@ -73,8 +75,8 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 		in.DeclaredLine = uint16(i)
 	}
 
-	// Comment by virtue of long whitespace prefix
-	if strings.HasPrefix(lp.Rest(), comment_whitespace_prefix) {
+	// Flavor considers this line extra commenty for some reason?
+	if a.ExtraCommenty != nil && a.ExtraCommenty(lp.Rest()) {
 		in.Type = inst.TypeNone
 		return in, nil
 	}
@@ -89,6 +91,16 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 	// See if we have a label at the start
 	if lp.AcceptRun(a.LabelChars) {
 		in.Label = lp.Emit()
+
+		// Some need colons after labels, some allow them.
+		switch a.LabelColons {
+		case ReqRequired:
+			if !lp.Consume(":") {
+				return inst.I{}, line.Errorf("label '%s' must end in colon", in.Label)
+			}
+		case ReqOptional:
+			lp.Consume(":")
+		}
 	}
 
 	// Ignore whitespace at the start or after the label.
@@ -122,6 +134,7 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Command = lp.Emit()
 	if dir, ok := a.Directives[in.Command]; ok {
 		in.Type = dir.Type
+		in.Var = dir.Var
 		if dir.Func == nil {
 			return in, nil
 		}
@@ -217,7 +230,11 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 
 	// Nothing else on the line? Must be MODE_A
 	lp.Consume(whitespace)
-	if lp.Consume(whitespace) || lp.Peek() == lines.Eol {
+	if !a.TwoSpacesIsComment {
+		lp.IgnoreRun(whitespace)
+	}
+	if (a.TwoSpacesIsComment && lp.Consume(whitespace)) || lp.Peek() == lines.Eol || lp.Peek() == ';' {
+		// Nothing left on line except comments.
 		if !summary.AnyModes(opcodes.MODE_A) {
 			return i, in.Errorf("%s with no arguments", in.Command)
 		}
@@ -242,6 +259,29 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
 		return i, err
+	}
+	if !indirect && (expr.Text == "a" || expr.Text == "A") {
+		if !summary.AnyModes(opcodes.MODE_A) {
+			return i, in.Errorf("%s doesn't support A mode", in.Command)
+		}
+		switch a.ExplicitARegister {
+		case ReqDisallowed:
+			return i, in.Errorf("Assembler flavor doesn't support A mode", in.Command)
+		case ReqOptional, ReqRequired:
+			op, ok := summary.OpForMode(opcodes.MODE_A)
+			if !ok {
+				panic(fmt.Sprintf("%s doesn't support accumulator mode", in.Command))
+			}
+			in.Data = []byte{op.Byte}
+			in.WidthKnown = true
+			in.MinWidth = 1
+			in.MaxWidth = 1
+			in.Final = true
+			in.Mode = opcodes.MODE_A
+			in.Exprs = nil
+			return in, nil
+
+		}
 	}
 	in.Exprs = append(in.Exprs, expr)
 	comma := lp.Consume(",")
@@ -293,12 +333,19 @@ func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
+	a.SetAsciiVariation(&in, lp)
 	var invert, invertLast byte
-	if lp.Consume("-") {
+	switch in.Var {
+	case inst.DataAscii:
+	case inst.DataAsciiHi:
 		invert = 0x80
-	}
-	if in.Command == ".AT" {
+	case inst.DataAsciiFlip:
 		invertLast = 0x80
+	case inst.DataAsciiHiFlip:
+		invert = 0x80
+		invertLast = 0x80
+	default:
+		panic(fmt.Sprintf("ParseAscii with weird Variation: %d", in.Var))
 	}
 	delim := lp.Next()
 	if delim == lines.Eol || strings.IndexRune(whitespace, delim) >= 0 {
@@ -307,7 +354,7 @@ func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.Ignore()
 	lp.AcceptUntil(string(delim))
 	delim2 := lp.Next()
-	if delim != delim2 {
+	if delim != delim2 && !(delim2 == lines.Eol && a.StringEndOptional) {
 		return inst.I{}, in.Errorf("%s: expected closing delimeter '%s'; got '%s'", in.Command, delim, delim2)
 	}
 	lp.Backup()

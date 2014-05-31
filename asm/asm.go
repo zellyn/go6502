@@ -2,6 +2,7 @@ package asm
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/zellyn/go6502/asm/flavors"
@@ -265,4 +266,46 @@ func (a *Assembler) Membuf() (*membuf.Membuf, error) {
 		}
 	}
 	return m, nil
+}
+
+func (a *Assembler) GenerateListing(w io.Writer, width int) error {
+	for _, in := range a.Insts {
+		if !in.Final {
+			return in.Errorf("cannot finalize value: %s", in)
+		}
+		if !in.AddrKnown {
+			return in.Errorf("address unknown: %s", in)
+		}
+
+		for i := 0; i < len(in.Data) || i < width; i++ {
+			if i%width == 0 {
+				s := fmt.Sprintf("%04x:", int(in.Addr)+i)
+				if i > 0 {
+					s = "\n" + s
+				}
+				if _, err := fmt.Fprint(w, s); err != nil {
+					return err
+				}
+			}
+
+			s := "   "
+			if i < len(in.Data) {
+				s = fmt.Sprintf(" %02x", in.Data[i])
+			}
+			if _, err := fmt.Fprint(w, s); err != nil {
+				return err
+			}
+
+			if i == width-1 {
+				if _, err := fmt.Fprint(w, "    "+in.Line.Text()); err != nil {
+					return err
+				}
+			}
+
+		}
+		if _, err := fmt.Fprint(w, "\n"); err != nil {
+			return err
+		}
+	}
+	return nil
 }

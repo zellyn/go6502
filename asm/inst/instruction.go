@@ -25,9 +25,7 @@ const (
 	TypeIfdefElse  // Ifdef else block
 	TypeIfdefEnd   // Ifdef end
 	TypeInclude    // Include a file
-	TypeData       // Data: hex, ascii, etc., etc.
-	TypeDataBytes  // Data: expressions, but forced to one byte per
-	TypeDataWords  // Data: expressions, but forced to one word per
+	TypeData       // Data
 	TypeBlock      // Block storage
 	TypeOrg        // Where to store assembled code
 	TypeTarget     // Target address to use for jumps, labels, etc.
@@ -35,6 +33,18 @@ const (
 	TypeEqu        // Equate
 	TypeOp         // An actual asm opcode
 	TypeEnd        // End assembly
+)
+
+// Variants for "TypeData" instructions.
+const (
+	DataBytes       = iota // Data: expressions, but forced to one byte per
+	DataMixed              // Bytes or words (LE), depending on individual expression widths
+	DataWordsLe            // Data: expressions, but forced to one word per, little-endian
+	DataWordsBe            // Data: expressions, but forced to one word per, big-endian
+	DataAscii              // Data: from ASCII strings, high bit clear
+	DataAsciiHi            // Data: from ASCII strings, high bit set
+	DataAsciiFlip          // Data: from ASCII strings, high bit clear, except last char
+	DataAsciiHiFlip        // Data: from ASCII strings, high bit set, except last char
 )
 
 type I struct {
@@ -54,10 +64,11 @@ type I struct {
 	ZeroMode     opcodes.AddressingMode // Possible ZP-option mode
 	ZeroOp       byte                   // Possible ZP-option Opcode
 	Value        uint16                 // For Equates, the value
-	DeclaredLine uint16
-	Line         *lines.Line
-	Addr         uint16
-	AddrKnown    bool
+	DeclaredLine uint16                 // Line number listed in file
+	Line         *lines.Line            // Line object for this line
+	Addr         uint16                 // Current memory address
+	AddrKnown    bool                   // Whether the current memory address is known
+	Var          int                    // Variant of instruction type
 }
 
 func (i I) TypeString() string {
@@ -81,7 +92,20 @@ func (i I) TypeString() string {
 	case TypeInclude:
 		return "inc"
 	case TypeData:
-		return "data"
+		switch i.Var {
+		case DataMixed:
+			return "data"
+		case DataBytes:
+			return "data/b"
+		case DataWordsLe:
+			return "data/wle"
+		case DataWordsBe:
+			return "data/wbe"
+		case DataAscii, DataAsciiHi, DataAsciiFlip, DataAsciiHiFlip:
+			return "data/b"
+		default:
+			panic(fmt.Sprintf("unknown data variant: %d", i.Var))
+		}
 	case TypeBlock:
 		return "block"
 	case TypeOrg:
@@ -243,7 +267,15 @@ func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, err
 	data := []byte{}
 	var width uint16
 	for _, e := range i.Exprs {
-		w := e.Width()
+		var w uint16
+		switch i.Var {
+		case DataMixed:
+			w = e.Width()
+		case DataBytes:
+			w = 1
+		case DataWordsLe, DataWordsBe:
+			w = 2
+		}
 		width += w
 		val, labelMissing, err := e.CheckedEval(c, i.Line)
 		if err != nil && !labelMissing {
@@ -255,11 +287,22 @@ func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, err
 				return false, err
 			}
 		}
-		switch w {
-		case 1:
+		switch i.Var {
+		case DataMixed:
+			switch w {
+			case 1:
+				data = append(data, byte(val))
+			case 2:
+				data = append(data, byte(val), byte(val>>8))
+			}
+		case DataBytes:
 			data = append(data, byte(val))
-		case 2:
+		case DataWordsLe:
 			data = append(data, byte(val), byte(val>>8))
+		case DataWordsBe:
+			data = append(data, byte(val>>8), byte(val))
+		default:
+			panic(fmt.Sprintf("Unknown data variant handed to computeData: %d", i.Var))
 		}
 	}
 	i.MinWidth = width
@@ -390,10 +433,10 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 		// Found both current and target addresses
 		offset := int32(val) - (int32(curr) + 2)
 		if offset > 127 {
-			return false, i.Errorf("%s cannot jump forward %d (max 127)", i.Command, offset)
+			return false, i.Errorf("%s cannot jump forward %d (max 127) from $%04x to $%04x", i.Command, offset, curr+2, val)
 		}
 		if offset < -128 {
-			return false, i.Errorf("%s cannot jump back %d (max -128)", i.Command, offset)
+			return false, i.Errorf("%s cannot jump back %d (max -128) from $%04x to $%04x", i.Command, offset, curr+2, val)
 		}
 		val = uint16(offset)
 	}
