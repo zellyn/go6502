@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/zellyn/go6502/asm"
+	"github.com/zellyn/go6502/asm/flavors/redbook"
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/asm/membuf"
@@ -25,6 +26,7 @@ func TestMultiline(t *testing.T) {
 	o := lines.NewTestOpener()
 
 	ss := asm.NewAssembler(scma.New(), o)
+	rb := asm.NewAssembler(redbook.New(), o)
 	// aa := asm.NewAssembler(as65.New(), o)
 	// mm := asm.NewAssembler(merlin.New(), o)
 
@@ -216,6 +218,15 @@ func TestMultiline(t *testing.T) {
 			{0x1000, h("a901a903ea")},
 			{0x2000, h("a902")},
 		}, true},
+
+		// Check turning MSB on and off
+		{rb, "MSB toggle", []string{
+			" ASC 'AB'",
+			" MSB OFF",
+			" ASC 'AB'",
+			" MSB ON",
+			" ASC 'AB'",
+		}, nil, "c1c24142c1c2", nil, true},
 	}
 
 	for i, tt := range tests {
@@ -231,7 +242,7 @@ func TestMultiline(t *testing.T) {
 		for k, v := range tt.ii {
 			o[k] = strings.Join(v, "\n")
 		}
-		if err := tt.a.Load("TESTFILE"); err != nil {
+		if err := tt.a.Load("TESTFILE", 0); err != nil {
 			t.Errorf(`%d("%s"): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, err)
 			continue
 		}

@@ -23,5 +23,5 @@ func (m M) LineSource(flavor flavors.F, in inst.I, macroCall int) (lines.LineSou
 		}
 		ls = append(ls, subbed)
 	}
-	return lines.NewSimpleLineSource(context, ls), nil
+	return lines.NewSimpleLineSource(context, ls, 0), nil
 }

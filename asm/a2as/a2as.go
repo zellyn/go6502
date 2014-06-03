@@ -36,6 +36,7 @@ var outfile = flag.String("out", "", "output file")
 var listfile = flag.String("listing", "", "listing file")
 var format = flag.String("format", "binary", "output format: binary/ihex")
 var fill = flag.Uint("fillbyte", 0x00, "byte value to use when filling gaps between assmebler output regions")
+var prefix = flag.Int("prefix", -1, "length of prefix to skip past addresses and bytes, -1 to guess")
 
 func main() {
 	flag.Parse()
@@ -69,7 +70,17 @@ func main() {
 	var o lines.OsOpener
 	a := asm.NewAssembler(f, o)
 
-	if err := a.Assemble(*infile); err != nil {
+	p := *prefix
+	if p < 0 {
+		var err error
+		p, err = lines.GuessFilePrefixSize(*infile, o)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error trying to determine prefix length for file '%s'", *infile, err)
+			os.Exit(1)
+		}
+	}
+
+	if err := a.AssembleWithPrefix(*infile, p); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

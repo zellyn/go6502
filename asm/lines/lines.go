@@ -81,6 +81,7 @@ type SimpleLineSource struct {
 	lines   []string
 	size    int
 	curr    int
+	prefix  int
 }
 
 func (sls *SimpleLineSource) Next() (line Line, done bool, err error) {
@@ -88,16 +89,22 @@ func (sls *SimpleLineSource) Next() (line Line, done bool, err error) {
 		return Line{}, true, nil
 	}
 	sls.curr++
-	return NewLine(sls.lines[sls.curr-1], sls.curr, &sls.context), false, nil
+	l := NewLine(sls.lines[sls.curr-1], sls.curr, &sls.context)
+	for i := 0; i < sls.prefix; i++ {
+		l.Parse.Next()
+		l.Parse.Ignore()
+	}
+	return l, false, nil
 }
 
 func (sls SimpleLineSource) Context() Context {
 	return sls.context
 }
-func NewSimpleLineSource(context Context, ls []string) LineSource {
+func NewSimpleLineSource(context Context, ls []string, prefix int) LineSource {
 	return &SimpleLineSource{
 		context: context,
 		lines:   ls,
 		size:    len(ls),
+		prefix:  prefix,
 	}
 }

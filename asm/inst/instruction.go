@@ -33,6 +33,7 @@ const (
 	TypeEqu        // Equate
 	TypeOp         // An actual asm opcode
 	TypeEnd        // End assembly
+	TypeSetting    // An on/off setting toggle
 )
 
 // Variants for "TypeData" instructions.
@@ -118,6 +119,8 @@ func (i I) TypeString() string {
 		return "="
 	case TypeEnd:
 		return "end"
+	case TypeSetting:
+		return "set"
 	case TypeOp:
 		modeStr := "?"
 		switch i.Mode {
@@ -158,6 +161,8 @@ func (i I) String() string {
 	switch i.Type {
 	case TypeInclude:
 		return fmt.Sprintf("{inc '%s'}", i.TextArg)
+	case TypeSetting:
+		return fmt.Sprintf("{set %s %s}", i.Command, i.TextArg)
 	}
 	s := "{" + i.TypeString()
 	if i.Label != "" {

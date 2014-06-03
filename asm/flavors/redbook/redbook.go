@@ -12,7 +12,6 @@ import (
 // RedBook implements a Redbook-listing-compatible-ish assembler flavor.
 type RedBook struct {
 	oldschool.Base
-	asciiHi bool
 }
 
 func New() *RedBook {
@@ -45,7 +44,6 @@ func New() *RedBook {
 		".EM":   {inst.TypeMacroEnd, a.ParseNoArgDir, 0},
 		".US":   {inst.TypeNone, a.ParseNotImplemented, 0},
 		"PAGE":  {inst.TypeNone, nil, 0}, // New page
-		"LST":   {inst.TypeNone, nil, 0}, // Listing on/off
 		"SBTL":  {inst.TypeNone, nil, 0}, // Subtitle
 		"SKP":   {inst.TypeNone, nil, 0}, // Skip lines
 		"REP":   {inst.TypeNone, nil, 0}, // Repeat character
@@ -61,9 +59,14 @@ func New() *RedBook {
 		"=": expr.OpEq,
 	}
 
+	a.OnOff = map[string]bool{
+		"MSB": true, // MSB defaults to true, as per manual
+		"LST": true, // Display listing: not used
+	}
+
 	a.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
 		if in.Command == "ASC" {
-			if a.asciiHi {
+			if a.Setting("MSB") {
 				in.Var = inst.DataAsciiHi
 			} else {
 				in.Var = inst.DataAscii

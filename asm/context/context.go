@@ -13,6 +13,10 @@ type Context interface {
 	RemoveChanged()
 	AddrKnown() bool
 	Clear()
+	SettingOn(name string) error
+	SettingOff(name string) error
+	Setting(name string) bool
+	HasSetting(name string) bool
 }
 
 type SimpleContext struct {
@@ -21,6 +25,7 @@ type SimpleContext struct {
 	lastLabel string
 	clearMesg string // Saved message describing why Addr was cleared.
 	highbit   byte   // OR-mask for ASCII high bit
+	OnOff     map[string]bool
 }
 
 type symbolValue struct {
@@ -93,4 +98,37 @@ func (sc *SimpleContext) RemoveChanged() {
 func (sc *SimpleContext) Clear() {
 	sc.symbols = make(map[string]symbolValue)
 	sc.highbit = 0x00
+}
+
+func (sc *SimpleContext) SettingOn(name string) error {
+	if !sc.HasSetting(name) {
+		return fmt.Errorf("no settable variable named '%s'", name)
+	}
+	if sc.OnOff == nil {
+		sc.OnOff = map[string]bool{name: true}
+	} else {
+		sc.OnOff[name] = true
+	}
+	return nil
+}
+
+func (sc *SimpleContext) SettingOff(name string) error {
+	if !sc.HasSetting(name) {
+		return fmt.Errorf("no settable variable named '%s'", name)
+	}
+	if sc.OnOff == nil {
+		sc.OnOff = map[string]bool{name: false}
+	} else {
+		sc.OnOff[name] = false
+	}
+	return nil
+}
+
+func (sc *SimpleContext) Setting(name string) bool {
+	return sc.OnOff[name]
+}
+
+func (sc *SimpleContext) HasSetting(name string) bool {
+	_, ok := sc.OnOff[name]
+	return ok
 }

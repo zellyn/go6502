@@ -29,10 +29,10 @@ func NewAssembler(flavor flavors.F, opener lines.Opener) *Assembler {
 }
 
 // Load loads a new assembler file, deleting any previous data.
-func (a *Assembler) Load(filename string) error {
+func (a *Assembler) Load(filename string, prefix int) error {
 	a.initPass()
 	context := lines.Context{Filename: filename}
-	ls, err := lines.NewFileLineSource(filename, context, a.Opener)
+	ls, err := lines.NewFileLineSource(filename, context, a.Opener, prefix)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (a *Assembler) Load(filename string) error {
 			lineSources = lineSources[1:]
 			continue
 		}
-		in, err := a.Flavor.ParseInstr(line)
+		in, parseErr := a.Flavor.ParseInstr(line)
 		if len(ifdefs) > 0 && !ifdefs[0] && in.Type != inst.TypeIfdefElse && in.Type != inst.TypeIfdefEnd {
 			// we're in an inactive ifdef branch
 			continue
@@ -63,6 +63,9 @@ func (a *Assembler) Load(filename string) error {
 
 		switch in.Type {
 		case inst.TypeUnknown:
+			if parseErr != nil {
+				return parseErr
+			}
 			return line.Errorf("unknown instruction: %s", line.Parse.Text())
 		case inst.TypeMacroStart:
 			if err := a.readMacro(in, lineSources[0]); err != nil {
@@ -104,7 +107,7 @@ func (a *Assembler) Load(filename string) error {
 		case inst.TypeInclude:
 			filename = filepath.Join(filepath.Dir(in.Line.Context.Filename), in.TextArg)
 			subContext := lines.Context{Filename: filename, Parent: in.Line}
-			subLs, err := lines.NewFileLineSource(filename, subContext, a.Opener)
+			subLs, err := lines.NewFileLineSource(filename, subContext, a.Opener, prefix)
 			if err != nil {
 				return in.Errorf("error including file: %v", err)
 			}
@@ -123,8 +126,12 @@ func (a *Assembler) Load(filename string) error {
 }
 
 func (a *Assembler) Assemble(filename string) error {
+	return a.AssembleWithPrefix(filename, 0)
+}
+
+func (a *Assembler) AssembleWithPrefix(filename string, prefix int) error {
 	a.Reset()
-	if err := a.Load(filename); err != nil {
+	if err := a.Load(filename, prefix); err != nil {
 		return err
 	}
 

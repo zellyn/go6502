@@ -26,6 +26,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 	}{
 		{ss, "* Comment", "{-}", ""},
 		{rb, "* Comment", "{-}", ""},
+		{rb, "                       ; Comment", "{-}", ""},
 		{aa, "; Comment", "{-}", ""},
 		{mm, "* Comment", "{-}", ""},
 		{ss, "                                        far-out-comment", "{-}", ""},
@@ -121,11 +122,11 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, ` .AT -"ABC"`, "{data/b}", "c1c243"},
 		{ss, ` .AS -dABCd`, "{data/b}", "c1c2c3"},
 		{ss, ` .AT -dABCd`, "{data/b}", "c1c243"},
-		{rb, ` ASC "ABC"`, "{data/b}", "414243"},
-		{rb, ` ASC $ABC$ ;comment`, "{data/b}", "414243"},
-		{rb, ` ASC $ABC`, "{data/b}", "414243"},
+		{rb, ` ASC "ABC"`, "{data/b}", "c1c2c3"},
+		{rb, ` ASC $ABC$ ;comment`, "{data/b}", "c1c2c3"},
+		{rb, ` ASC $ABC`, "{data/b}", "c1c2c3"},
 		{rb, ` DCI "ABC"`, "{data/b}", "4142c3"},
-		{rb, ` ASC -ABC-`, "{data/b}", "414243"},
+		{rb, ` ASC -ABC-`, "{data/b}", "c1c2c3"},
 		{ss, " .HS 0001ffAb", "{data/b}", "0001ffab"},
 		{ss, "A.B .EQ *-C.D", "{= 'A.B' (- * C.D)}", ""},
 		{ss, " .BS $8", "{block $0008}", "xxxxxxxxxxxxxxxx"},
@@ -140,6 +141,10 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " LDX #']+$80", "{LDX/imm (lsb (+ $005d $0080))}", "a2dd"},
 
 		{ss, " CMP #';'+1", "{CMP/imm (lsb (+ $003b $0001))}", "c93c"},
+		{rb, " LST ON", "{set LST ON}", ""},
+		{rb, " LST OFF", "{set LST OFF}", ""},
+		{rb, " MSB ON", "{set MSB ON}", ""},
+		{rb, " MSB OFF", "{set MSB OFF}", ""},
 	}
 
 	// TODO(zellyn): Add tests for finalization of four SCMA directives:

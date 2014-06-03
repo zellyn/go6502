@@ -83,7 +83,7 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 
 	// Empty line or comment
 	trimmed := strings.TrimSpace(lp.Rest())
-	if trimmed == "" || trimmed[0] == '*' {
+	if trimmed == "" || trimmed[0] == '*' || trimmed[0] == ';' {
 		in.Type = inst.TypeNone
 		return in, nil
 	}
@@ -141,11 +141,35 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 		return dir.Func(in, lp)
 	}
 
+	if a.HasSetting(in.Command) {
+		return a.ParseSetting(in, lp)
+	}
+
 	if summary, ok := opcodes.ByName[in.Command]; ok {
 		in.Type = inst.TypeOp
 		return a.ParseOpArgs(in, lp, summary)
 	}
 	return inst.I{}, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
+}
+
+func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
+	in.Type = inst.TypeSetting
+	lp.IgnoreRun(whitespace)
+	if !lp.AcceptRun(Letters) {
+		c := lp.Next()
+		return inst.I{}, in.Errorf("expecting ON/OFF, found '%s'", c)
+	}
+	in.TextArg = lp.Emit()
+	switch in.TextArg {
+	case "ON":
+		a.SettingOn(in.Command)
+	case "OFF":
+		a.SettingOff(in.Command)
+	default:
+		return inst.I{}, in.Errorf("expecting ON/OFF, found '%s'", in.TextArg)
+	}
+	return in, nil
+
 }
 
 // ParseMacroCall parses a macro call. We expect to be looking at a the

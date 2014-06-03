@@ -68,3 +68,14 @@ http://mirrors.apple2.org.za/ftp.apple.asimov.net/images/programming/assembler/E
 ** How to run
 Boot from the disk
 type "- edasm.system"
+
+** Differences from manual
+The manual claims that "MSB ON" is the default.
+
+:ASM FOO.TXT
+SOURCE   FILE #01 =>FOO.TXT
+0000:41 42 43        1           ASC   "ABC"
+0003:                2           MSB   OFF
+0003:41 42 43        3           ASC   "ABC"
+0006:                4           MSB   ON
+0006:C1 C2 C3        5           ASC   "ABC"
