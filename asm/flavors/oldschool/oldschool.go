@@ -45,13 +45,14 @@ type Base struct {
 	Operators  map[string]expr.Operator
 	context.SimpleContext
 	context.LabelerBase
-	LabelChars         string
-	LabelColons        Requiredness
-	ExplicitARegister  Requiredness
-	ExtraCommenty      func(string) bool
-	TwoSpacesIsComment bool // two spaces after command means comment field?
-	StringEndOptional  bool // can omit closing delimeter from string args?
-	SetAsciiVariation  func(*inst.I, *lines.Parse)
+	LabelChars        string
+	LabelColons       Requiredness
+	ExplicitARegister Requiredness
+	ExtraCommenty     func(string) bool
+	SpacesForComment  int  // this many spaces after command means it's the comment field
+	StringEndOptional bool // can omit closing delimeter from string args?
+	SetAsciiVariation func(*inst.I, *lines.Parse)
+	CommentChar       rune
 }
 
 // Parse an entire instruction, or return an appropriate error.
@@ -83,7 +84,7 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 
 	// Empty line or comment
 	trimmed := strings.TrimSpace(lp.Rest())
-	if trimmed == "" || trimmed[0] == '*' || trimmed[0] == ';' {
+	if trimmed == "" || trimmed[0] == '*' || rune(trimmed[0]) == a.CommentChar {
 		in.Type = inst.TypeNone
 		return in, nil
 	}
@@ -253,11 +254,17 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 	}
 
 	// Nothing else on the line? Must be MODE_A
-	lp.Consume(whitespace)
-	if !a.TwoSpacesIsComment {
-		lp.IgnoreRun(whitespace)
+	lp.AcceptRun(whitespace)
+	ws := lp.Emit()
+	atEnd := false
+	if a.SpacesForComment != 0 && len(ws) >= a.SpacesForComment {
+		atEnd = true
 	}
-	if (a.TwoSpacesIsComment && lp.Consume(whitespace)) || lp.Peek() == lines.Eol || lp.Peek() == ';' {
+	if lp.Peek() == lines.Eol || lp.Peek() == a.CommentChar {
+		atEnd = true
+	}
+
+	if atEnd {
 		// Nothing left on line except comments.
 		if !summary.AnyModes(opcodes.MODE_A) {
 			return i, in.Errorf("%s with no arguments", in.Command)

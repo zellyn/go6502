@@ -23,7 +23,7 @@ func New() *SCMA {
 	a.LabelChars = oldschool.Letters + oldschool.Digits + ".:"
 	a.LabelColons = oldschool.ReqDisallowed
 	a.ExplicitARegister = oldschool.ReqDisallowed
-	a.TwoSpacesIsComment = true
+	a.SpacesForComment = 2
 
 	a.Directives = map[string]oldschool.DirectiveInfo{
 		".IN":   {inst.TypeInclude, a.ParseInclude, 0},

@@ -19,8 +19,9 @@ var flavor string
 
 func init() {
 	flavorsByName = map[string]flavors.F{
-		"scma":    scma.New(),
-		"redbook": redbook.New(),
+		"scma":     scma.New(),
+		"redbooka": redbook.NewRedbookA(),
+		"redbookb": redbook.NewRedbookB(),
 	}
 	var names []string
 	for name := range flavorsByName {

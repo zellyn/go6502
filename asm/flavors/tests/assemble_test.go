@@ -26,7 +26,8 @@ func TestMultiline(t *testing.T) {
 	o := lines.NewTestOpener()
 
 	ss := asm.NewAssembler(scma.New(), o)
-	rb := asm.NewAssembler(redbook.New(), o)
+	ra := asm.NewAssembler(redbook.NewRedbookA(), o)
+	// rb := asm.NewAssembler(redbook.NewRedbookB(), o)
 	// aa := asm.NewAssembler(as65.New(), o)
 	// mm := asm.NewAssembler(merlin.New(), o)
 
@@ -220,7 +221,7 @@ func TestMultiline(t *testing.T) {
 		}, true},
 
 		// Check turning MSB on and off
-		{rb, "MSB toggle", []string{
+		{ra, "MSB toggle", []string{
 			" ASC 'AB'",
 			" MSB OFF",
 			" ASC 'AB'",

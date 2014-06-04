@@ -48,6 +48,12 @@ const (
 	DataAsciiHiFlip        // Data: from ASCII strings, high bit set, except last char
 )
 
+// Variants for "TypeEqu" instructions.
+const (
+	EquNormal = iota
+	EquPageZero
+)
+
 type I struct {
 	Type         Type                   // Type of instruction
 	Label        string                 // Text of label part

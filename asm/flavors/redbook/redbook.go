@@ -14,42 +14,52 @@ type RedBook struct {
 	oldschool.Base
 }
 
-func New() *RedBook {
-	a := &RedBook{}
+func NewRedbookA() *RedBook {
+	r := newRedbook()
+	return r
+}
 
-	a.LabelChars = oldschool.Letters + oldschool.Digits + "."
-	a.LabelColons = oldschool.ReqOptional
-	a.ExplicitARegister = oldschool.ReqRequired
-	a.StringEndOptional = true
+func NewRedbookB() *RedBook {
+	r := newRedbook()
+	r.ExplicitARegister = oldschool.ReqRequired
+	r.SpacesForComment = 3
+	return r
+}
 
-	a.Directives = map[string]oldschool.DirectiveInfo{
-		".IN":   {inst.TypeInclude, a.ParseInclude, 0},
-		"ORG":   {inst.TypeOrg, a.ParseAddress, 0},
-		"OBJ":   {inst.TypeNone, nil, 0},
-		".TF":   {inst.TypeNone, nil, 0},
-		".EN":   {inst.TypeEnd, a.ParseNoArgDir, 0},
-		"EQU":   {inst.TypeEqu, a.ParseEquate, 0},
-		"DFB":   {inst.TypeData, a.ParseData, inst.DataBytes},
-		"DW":    {inst.TypeData, a.ParseData, inst.DataWordsLe},
-		"DDB":   {inst.TypeData, a.ParseData, inst.DataWordsBe},
-		"ASC":   {inst.TypeData, a.ParseAscii, inst.DataAscii},
-		"DCI":   {inst.TypeData, a.ParseAscii, inst.DataAsciiFlip},
-		".BS":   {inst.TypeBlock, a.ParseBlockStorage, 0},
-		".LIST": {inst.TypeNone, nil, 0},
-		".PG":   {inst.TypeNone, nil, 0},
-		".DO":   {inst.TypeIfdef, a.ParseDo, 0},
-		".ELSE": {inst.TypeIfdefElse, a.ParseNoArgDir, 0},
-		".FIN":  {inst.TypeIfdefEnd, a.ParseNoArgDir, 0},
-		".MA":   {inst.TypeMacroStart, a.ParseMacroStart, 0},
-		".EM":   {inst.TypeMacroEnd, a.ParseNoArgDir, 0},
-		".US":   {inst.TypeNone, a.ParseNotImplemented, 0},
-		"PAGE":  {inst.TypeNone, nil, 0}, // New page
-		"SBTL":  {inst.TypeNone, nil, 0}, // Subtitle
-		"SKP":   {inst.TypeNone, nil, 0}, // Skip lines
-		"REP":   {inst.TypeNone, nil, 0}, // Repeat character
-		"CHR":   {inst.TypeNone, nil, 0}, // Set repeated character
+func newRedbook() *RedBook {
+	r := &RedBook{}
+
+	r.LabelChars = oldschool.Letters + oldschool.Digits + "."
+	r.LabelColons = oldschool.ReqOptional
+	r.ExplicitARegister = oldschool.ReqRequired
+	r.StringEndOptional = true
+	r.CommentChar = ';'
+
+	r.Directives = map[string]oldschool.DirectiveInfo{
+		"ORG":    {inst.TypeOrg, r.ParseAddress, 0},
+		"OBJ":    {inst.TypeNone, nil, 0},
+		"ENDASM": {inst.TypeEnd, r.ParseNoArgDir, 0},
+		"EQU":    {inst.TypeEqu, r.ParseEquate, inst.EquNormal},
+		"EPZ":    {inst.TypeEqu, r.ParseEquate, inst.EquPageZero},
+		"DFB":    {inst.TypeData, r.ParseData, inst.DataBytes},
+		"DW":     {inst.TypeData, r.ParseData, inst.DataWordsLe},
+		"DDB":    {inst.TypeData, r.ParseData, inst.DataWordsBe},
+		"ASC":    {inst.TypeData, r.ParseAscii, inst.DataAscii},
+		"DCI":    {inst.TypeData, r.ParseAscii, inst.DataAsciiFlip},
+		".DO":    {inst.TypeIfdef, r.ParseDo, 0},
+		".ELSE":  {inst.TypeIfdefElse, r.ParseNoArgDir, 0},
+		".FIN":   {inst.TypeIfdefEnd, r.ParseNoArgDir, 0},
+		".MA":    {inst.TypeMacroStart, r.ParseMacroStart, 0},
+		".EM":    {inst.TypeMacroEnd, r.ParseNoArgDir, 0},
+		".US":    {inst.TypeNone, r.ParseNotImplemented, 0},
+		"PAGE":   {inst.TypeNone, nil, 0}, // New page
+		"TITLE":  {inst.TypeNone, nil, 0}, // Title
+		"SBTL":   {inst.TypeNone, nil, 0}, // Subtitle
+		"SKP":    {inst.TypeNone, nil, 0}, // Skip lines
+		"REP":    {inst.TypeNone, nil, 0}, // Repeat character
+		"CHR":    {inst.TypeNone, nil, 0}, // Set repeated character
 	}
-	a.Operators = map[string]expr.Operator{
+	r.Operators = map[string]expr.Operator{
 		"*": expr.OpMul,
 		"/": expr.OpDiv,
 		"+": expr.OpPlus,
@@ -59,14 +69,14 @@ func New() *RedBook {
 		"=": expr.OpEq,
 	}
 
-	a.OnOff = map[string]bool{
+	r.OnOff = map[string]bool{
 		"MSB": true, // MSB defaults to true, as per manual
 		"LST": true, // Display listing: not used
 	}
 
-	a.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
+	r.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
 		if in.Command == "ASC" {
-			if a.Setting("MSB") {
+			if r.Setting("MSB") {
 				in.Var = inst.DataAsciiHi
 			} else {
 				in.Var = inst.DataAscii
@@ -80,5 +90,5 @@ func New() *RedBook {
 		}
 	}
 
-	return a
+	return r
 }
