@@ -93,7 +93,7 @@ func (lp *Parse) AcceptRun(valid string) bool {
 }
 
 func (lp *Parse) AcceptUntil(until string) bool {
-	until += "\n"
+	until += string(Eol)
 	some := false
 	for strings.IndexRune(until, lp.Next()) < 0 {
 		some = true

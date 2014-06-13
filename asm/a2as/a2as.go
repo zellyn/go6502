@@ -8,6 +8,7 @@ import (
 
 	"github.com/zellyn/go6502/asm"
 	"github.com/zellyn/go6502/asm/flavors"
+	"github.com/zellyn/go6502/asm/flavors/merlin"
 	"github.com/zellyn/go6502/asm/flavors/redbook"
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/ihex"
@@ -19,6 +20,7 @@ var flavor string
 
 func init() {
 	flavorsByName = map[string]flavors.F{
+		"merlin":   merlin.New(),
 		"scma":     scma.New(),
 		"redbooka": redbook.NewRedbookA(),
 		"redbookb": redbook.NewRedbookB(),
@@ -79,6 +81,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error trying to determine prefix length for file '%s'", *infile, err)
 			os.Exit(1)
 		}
+		fmt.Fprintf(os.Stderr, "Prefix guessed to be %d\n", p)
 	}
 
 	if err := a.AssembleWithPrefix(*infile, p); err != nil {

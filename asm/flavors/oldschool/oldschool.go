@@ -15,8 +15,9 @@ import (
 	"github.com/zellyn/go6502/opcodes"
 )
 
-const Letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const Letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
 const Digits = "0123456789"
+const binarydigits = "01"
 const hexdigits = Digits + "abcdefABCDEF"
 const whitespace = " \t"
 const cmdChars = Letters + "."
@@ -33,9 +34,9 @@ type DirectiveInfo struct {
 type Requiredness int
 
 const (
-	ReqOptional Requiredness = iota
+	ReqDisallowed Requiredness = iota
+	ReqOptional
 	ReqRequired
-	ReqDisallowed
 )
 
 // Base implements the S-C Macro Assembler-compatible assembler flavor.
@@ -48,11 +49,16 @@ type Base struct {
 	LabelChars        string
 	LabelColons       Requiredness
 	ExplicitARegister Requiredness
+	HexCommas         Requiredness
 	ExtraCommenty     func(string) bool
 	SpacesForComment  int  // this many spaces after command means it's the comment field
 	StringEndOptional bool // can omit closing delimeter from string args?
 	SetAsciiVariation func(*inst.I, *lines.Parse)
 	CommentChar       rune
+	BinaryChar        rune
+	MsbChars          string
+	LsbChars          string
+	ImmediateChars    string
 }
 
 // Parse an entire instruction, or return an appropriate error.
@@ -107,7 +113,7 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 	// Ignore whitespace at the start or after the label.
 	lp.IgnoreRun(whitespace)
 
-	if lp.Peek() == lines.Eol {
+	if lp.Peek() == lines.Eol || lp.Peek() == a.CommentChar {
 		in.Type = inst.TypeNone
 		return in, nil
 	}
@@ -128,7 +134,7 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 	if lp.Consume(">") {
 		return a.ParseMacroCall(in, lp)
 	}
-	if !lp.AcceptRun(cmdChars) {
+	if !lp.AcceptRun(cmdChars) && !(a.Directives["="].Func != nil && lp.Accept("=")) {
 		c := lp.Next()
 		return inst.I{}, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
 	}
@@ -453,17 +459,26 @@ func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
-	if !lp.AcceptRun(hexdigits) {
-		return inst.I{}, in.Errorf("%s expects hex digits; got '%s'", in.Command, lp.Next())
-	}
-	hs := lp.Emit()
-	if len(hs)%2 != 0 {
-		return inst.I{}, in.Errorf("%s expects pairs of hex digits; got %d", in.Command, len(hs))
-	}
-	var err error
-	if in.Data, err = hex.DecodeString(hs); err != nil {
-		return inst.I{}, in.Errorf("%s: error decoding hex string: %s", in.Command, err)
+	lp.AcceptRun(whitespace)
+	for {
+		lp.Ignore()
+		if !lp.AcceptRun(hexdigits) {
+			return inst.I{}, in.Errorf("%s expects hex digits; got '%s'", in.Command, lp.Next())
+		}
+		hs := lp.Emit()
+		if len(hs)%2 != 0 {
+			return inst.I{}, in.Errorf("%s expects pairs of hex digits; got %d", in.Command, len(hs))
+		}
+		data, err := hex.DecodeString(hs)
+		if err != nil {
+			return inst.I{}, in.Errorf("%s: error decoding hex string: %s", in.Command, err)
+		}
+		in.Data = append(in.Data, data...)
+
+		// Keep going if we allow commas and have one
+		if a.HexCommas == ReqDisallowed || !lp.Accept(",") {
+			break
+		}
 	}
 	return in, nil
 }
@@ -508,12 +523,30 @@ func (a *Base) ParseNotImplemented(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
 	var outer *expr.E
-	if lp.Accept("#/") {
-		switch lp.Emit() {
-		case "#":
-			outer = &expr.E{Op: expr.OpLsb}
-		case "/":
-			outer = &expr.E{Op: expr.OpMsb}
+	if lp.AcceptRun(a.MsbChars + a.LsbChars + a.ImmediateChars) {
+		pc := lp.Emit()
+		switch len(pc) {
+		case 1:
+			switch {
+			case strings.Contains(a.MsbChars, pc[:1]):
+				outer = &expr.E{Op: expr.OpMsb}
+			case strings.Contains(a.LsbChars+a.ImmediateChars, pc[:1]):
+				outer = &expr.E{Op: expr.OpLsb}
+			}
+		case 2:
+			err := in.Errorf("Got strange number prefix: '%s'", pc)
+			switch {
+			case !strings.Contains(a.ImmediateChars, pc[:1]):
+				return &expr.E{}, err
+			case strings.Contains(a.MsbChars, pc[1:]):
+				outer = &expr.E{Op: expr.OpMsb}
+			case strings.Contains(a.LsbChars, pc[1:]):
+				outer = &expr.E{Op: expr.OpLsb}
+			default:
+				return &expr.E{}, err
+			}
+		default:
+			return &expr.E{}, in.Errorf("Expected one or two number prefixes, got '%s'", pc)
 		}
 	}
 
@@ -564,6 +597,22 @@ func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 		i, err := strconv.ParseUint(s, 16, 16)
 		if err != nil {
 			return &expr.E{}, in.Errorf("invalid hex number: %s: %s", s, err)
+		}
+		ex.Op = expr.OpLeaf
+		ex.Val = uint16(i)
+		return top, nil
+	}
+
+	// Hex
+	if lp.Consume(string(a.BinaryChar)) {
+		if !lp.AcceptRun(binarydigits) {
+			c := lp.Next()
+			return &expr.E{}, in.Errorf("expecting binary number, found '%c' (%d)", c, c)
+		}
+		s := lp.Emit()
+		i, err := strconv.ParseUint(s, 2, 16)
+		if err != nil {
+			return &expr.E{}, in.Errorf("invalid binary number: %s: %s", s, err)
 		}
 		ex.Op = expr.OpLeaf
 		ex.Val = uint16(i)

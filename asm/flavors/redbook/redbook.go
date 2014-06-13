@@ -34,6 +34,8 @@ func newRedbook() *RedBook {
 	r.ExplicitARegister = oldschool.ReqRequired
 	r.StringEndOptional = true
 	r.CommentChar = ';'
+	r.MsbChars = "/"
+	r.ImmediateChars = "#"
 
 	r.Directives = map[string]oldschool.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, r.ParseAddress, 0},

@@ -43,8 +43,8 @@ const (
 	DataWordsLe            // Data: expressions, but forced to one word per, little-endian
 	DataWordsBe            // Data: expressions, but forced to one word per, big-endian
 	DataAscii              // Data: from ASCII strings, high bit clear
-	DataAsciiHi            // Data: from ASCII strings, high bit set
 	DataAsciiFlip          // Data: from ASCII strings, high bit clear, except last char
+	DataAsciiHi            // Data: from ASCII strings, high bit set
 	DataAsciiHiFlip        // Data: from ASCII strings, high bit set, except last char
 )
 

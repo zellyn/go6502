@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/zellyn/go6502/asm"
+	"github.com/zellyn/go6502/asm/flavors/merlin"
 	"github.com/zellyn/go6502/asm/flavors/redbook"
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/lines"
@@ -27,9 +28,7 @@ func TestMultiline(t *testing.T) {
 
 	ss := asm.NewAssembler(scma.New(), o)
 	ra := asm.NewAssembler(redbook.NewRedbookA(), o)
-	// rb := asm.NewAssembler(redbook.NewRedbookB(), o)
-	// aa := asm.NewAssembler(as65.New(), o)
-	// mm := asm.NewAssembler(merlin.New(), o)
+	mm := asm.NewAssembler(merlin.New(), o)
 
 	tests := []struct {
 		a      *asm.Assembler      // assembler
@@ -54,12 +53,21 @@ func TestMultiline(t *testing.T) {
 		}, nil, "adff00ea", nil, true},
 
 		// Sub-labels
-		{ss, "Sublabels", []string{
+		{ss, "ss:Sublabels", []string{
 			"L1 BEQ .1",
 			".1 NOP",
 			"L2 BEQ .2",
 			".1 NOP",
 			".2 NOP",
+		}, nil, "f000eaf001eaea", nil, true},
+
+		// Sub-labels
+		{mm, "mm:Sublabels", []string{
+			"L1   BEQ :ONE",
+			":ONE NOP",
+			"L2   BEQ :TWO",
+			":ONE NOP",
+			":TWO NOP",
 		}, nil, "f000eaf001eaea", nil, true},
 
 		// Includes: one level deep
@@ -228,6 +236,19 @@ func TestMultiline(t *testing.T) {
 			" MSB ON",
 			" ASC 'AB'",
 		}, nil, "c1c24142c1c2", nil, true},
+
+		// Merlin: macros, local labels
+		{mm, "Macros: local labels", []string{
+			"L1  NOP",
+			"M1  MAC",
+			"    INC ]1",
+			"    BNE L1",
+			"L1  NOP",
+			"    <<<",
+			"    >>> M1.$42",
+			"    PMC M1($43;$44",
+			"    M1 $44",
+		}, nil, "eae642d000eae643d000eae644d000ea", nil, true},
 	}
 
 	for i, tt := range tests {
