@@ -169,7 +169,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " .HS 0001FFAB", "{data/b}", "0001ffab"},
 		{ss, " .IN FILE.NAME", "{inc 'FILE.NAME'}", ""},
 		{ss, " .IN S.DEFS", "{inc 'S.DEFS'}", ""},
-		{ss, " .MA MacroName", "{macro 'MacroName'}", ""},
+		{ss, " .MA MacroName", `{macro "MacroName"}`, ""},
 		{ss, " .OR $D000", "{org $d000}", ""},
 		{ss, " .TF OUT.BIN", "{-}", ""},
 		{ss, " .TI 76,Title here", "{-}", ""},

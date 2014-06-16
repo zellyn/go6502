@@ -71,10 +71,10 @@ func newRedbook() *RedBook {
 		"=": expr.OpEq,
 	}
 
-	r.OnOff = map[string]bool{
+	r.SetOnOffDefaults(map[string]bool{
 		"MSB": true, // MSB defaults to true, as per manual
 		"LST": true, // Display listing: not used
-	}
+	})
 
 	r.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
 		if in.Command == "ASC" {

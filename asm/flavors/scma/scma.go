@@ -80,6 +80,35 @@ func New() *SCMA {
 		}
 	}
 
+	// ParseMacroCall parses a macro call. We expect in.Command to hold
+	// the "command column" value, which caused isMacroCall to return
+	// true, and the lp to be pointing to the following character
+	// (probably whitespace).
+	a.ParseMacroCall = func(in inst.I, lp *lines.Parse) (inst.I, bool, error) {
+		if in.Command == "" || in.Command[0] != '>' {
+			// not a macro call
+			return in, false, nil
+		}
+
+		in.Type = inst.TypeMacroCall
+		in.Command = in.Command[1:]
+
+		lp.Consume(oldschool.Whitespace)
+
+		for {
+			s, err := a.ParseMacroArg(in, lp)
+			if err != nil {
+				return inst.I{}, true, err
+			}
+			in.MacroArgs = append(in.MacroArgs, s)
+			if !lp.Consume(",") {
+				break
+			}
+		}
+
+		return in, true, nil
+	}
+
 	return a
 }
 

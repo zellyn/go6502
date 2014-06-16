@@ -68,11 +68,11 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			}
 			return line.Errorf("unknown instruction: %s", line.Parse.Text())
 		case inst.TypeMacroStart:
+
 			if err := a.readMacro(in, lineSources[0]); err != nil {
 				return err
 			}
 			continue // no need to append
-			return in.Errorf("macro start not (yet) implemented: %s", line)
 		case inst.TypeMacroCall:
 			macroCall++
 			m, ok := a.Macros[in.Command]

@@ -175,7 +175,7 @@ func (i I) String() string {
 		s += fmt.Sprintf(" '%s'", i.Label)
 	}
 	if i.TextArg != "" {
-		s += fmt.Sprintf(" '%s'", i.TextArg)
+		s += fmt.Sprintf(` "%s"`, i.TextArg)
 	}
 	if len(i.MacroArgs) > 0 {
 		ma := fmt.Sprintf("%#v", i.MacroArgs)[8:]

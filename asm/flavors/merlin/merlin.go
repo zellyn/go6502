@@ -67,14 +67,14 @@ func New() *Merlin {
 		"=": expr.OpEq,
 	}
 
-	m.OnOff = map[string]bool{
+	m.SetOnOffDefaults(map[string]bool{
 		"LST":   true,  // Display listing: not used
 		"XC":    false, // Extended commands: not implemented yet
 		"EXP":   false, // How to print macro calls
 		"LSTDO": false, // List conditional code?
 		"TR":    false, // truncate listing to 3 bytes?
 		"CYC":   false, // print cycle times?
-	}
+	})
 
 	m.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
 		if in.Command != "ASC" && in.Command != "DCI" {

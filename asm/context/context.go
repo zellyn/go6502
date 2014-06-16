@@ -17,15 +17,19 @@ type Context interface {
 	SettingOff(name string) error
 	Setting(name string) bool
 	HasSetting(name string) bool
+	AddMacroName(name string)
+	HasMacroName(name string) bool
 }
 
 type SimpleContext struct {
-	symbols   map[string]symbolValue
-	addr      int32
-	lastLabel string
-	clearMesg string // Saved message describing why Addr was cleared.
-	highbit   byte   // OR-mask for ASCII high bit
-	OnOff     map[string]bool
+	symbols       map[string]symbolValue
+	addr          int32
+	lastLabel     string
+	clearMesg     string // Saved message describing why Addr was cleared.
+	highbit       byte   // OR-mask for ASCII high bit
+	onOff         map[string]bool
+	onOffDefaults map[string]bool
+	macroNames    map[string]bool
 }
 
 type symbolValue struct {
@@ -98,16 +102,18 @@ func (sc *SimpleContext) RemoveChanged() {
 func (sc *SimpleContext) Clear() {
 	sc.symbols = make(map[string]symbolValue)
 	sc.highbit = 0x00
+	sc.macroNames = nil
+	sc.resetOnOff()
 }
 
 func (sc *SimpleContext) SettingOn(name string) error {
 	if !sc.HasSetting(name) {
 		return fmt.Errorf("no settable variable named '%s'", name)
 	}
-	if sc.OnOff == nil {
-		sc.OnOff = map[string]bool{name: true}
+	if sc.onOff == nil {
+		sc.onOff = map[string]bool{name: true}
 	} else {
-		sc.OnOff[name] = true
+		sc.onOff[name] = true
 	}
 	return nil
 }
@@ -116,19 +122,42 @@ func (sc *SimpleContext) SettingOff(name string) error {
 	if !sc.HasSetting(name) {
 		return fmt.Errorf("no settable variable named '%s'", name)
 	}
-	if sc.OnOff == nil {
-		sc.OnOff = map[string]bool{name: false}
+	if sc.onOff == nil {
+		sc.onOff = map[string]bool{name: false}
 	} else {
-		sc.OnOff[name] = false
+		sc.onOff[name] = false
 	}
 	return nil
 }
 
 func (sc *SimpleContext) Setting(name string) bool {
-	return sc.OnOff[name]
+	return sc.onOff[name]
 }
 
 func (sc *SimpleContext) HasSetting(name string) bool {
-	_, ok := sc.OnOff[name]
+	_, ok := sc.onOff[name]
 	return ok
+}
+
+func (sc *SimpleContext) AddMacroName(name string) {
+	if sc.macroNames == nil {
+		sc.macroNames = make(map[string]bool)
+	}
+	sc.macroNames[name] = true
+}
+
+func (sc *SimpleContext) HasMacroName(name string) bool {
+	return sc.macroNames[name]
+}
+
+func (sc *SimpleContext) resetOnOff() {
+	sc.onOff = make(map[string]bool)
+	for k, v := range sc.onOffDefaults {
+		sc.onOff[k] = v
+	}
+}
+
+func (sc *SimpleContext) SetOnOffDefaults(defaults map[string]bool) {
+	sc.onOffDefaults = defaults
+	sc.resetOnOff()
 }

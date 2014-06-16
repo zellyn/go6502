@@ -19,9 +19,8 @@ const Letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
 const Digits = "0123456789"
 const binarydigits = "01"
 const hexdigits = Digits + "abcdefABCDEF"
-const whitespace = " \t"
-const cmdChars = Letters + "."
-const macroNameChars = Letters + Digits + "._"
+const Whitespace = " \t"
+const cmdChars = Letters + Digits + ".>_"
 const fileChars = Letters + Digits + "."
 const operatorChars = "+-*/<>="
 
@@ -50,15 +49,16 @@ type Base struct {
 	LabelColons       Requiredness
 	ExplicitARegister Requiredness
 	HexCommas         Requiredness
-	ExtraCommenty     func(string) bool
 	SpacesForComment  int  // this many spaces after command means it's the comment field
 	StringEndOptional bool // can omit closing delimeter from string args?
-	SetAsciiVariation func(*inst.I, *lines.Parse)
 	CommentChar       rune
 	BinaryChar        rune
 	MsbChars          string
 	LsbChars          string
 	ImmediateChars    string
+	ExtraCommenty     func(string) bool
+	SetAsciiVariation func(*inst.I, *lines.Parse)
+	ParseMacroCall    func(inst.I, *lines.Parse) (inst.I, bool, error)
 }
 
 // Parse an entire instruction, or return an appropriate error.
@@ -111,7 +111,7 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 	}
 
 	// Ignore whitespace at the start or after the label.
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 
 	if lp.Peek() == lines.Eol || lp.Peek() == a.CommentChar {
 		in.Type = inst.TypeNone
@@ -131,14 +131,23 @@ func (a *Base) SetWidthsOnFirstPass() bool {
 // ParseCmd parses the "command" part of an instruction: we expect to be
 // looking at a non-whitespace character.
 func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
-	if lp.Consume(">") {
-		return a.ParseMacroCall(in, lp)
-	}
 	if !lp.AcceptRun(cmdChars) && !(a.Directives["="].Func != nil && lp.Accept("=")) {
 		c := lp.Next()
 		return inst.I{}, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
 	}
 	in.Command = lp.Emit()
+
+	// Give ParseMacroCall a chance
+	if a.ParseMacroCall != nil {
+		i, isMacro, err := a.ParseMacroCall(in, lp)
+		if err != nil {
+			return inst.I{}, err
+		}
+		if isMacro {
+			return i, nil
+		}
+	}
+
 	if dir, ok := a.Directives[in.Command]; ok {
 		in.Type = dir.Type
 		in.Var = dir.Var
@@ -156,12 +165,13 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 		in.Type = inst.TypeOp
 		return a.ParseOpArgs(in, lp, summary)
 	}
+
 	return inst.I{}, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
 }
 
 func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Type = inst.TypeSetting
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(Letters) {
 		c := lp.Next()
 		return inst.I{}, in.Errorf("expecting ON/OFF, found '%s'", c)
@@ -179,39 +189,13 @@ func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 }
 
-// ParseMacroCall parses a macro call. We expect to be looking at a the
-// first character of the macro name.
-func (a *Base) ParseMacroCall(in inst.I, lp *lines.Parse) (inst.I, error) {
-	in.Type = inst.TypeMacroCall
-	if !lp.AcceptRun(macroNameChars) {
-		c := lp.Next()
-		return inst.I{}, in.Errorf("expecting macro name, found '%c' (%d)", c, c)
-	}
-	in.Command = lp.Emit()
-
-	lp.Consume(whitespace)
-
-	for {
-		s, err := a.ParseMacroArg(in, lp)
-		if err != nil {
-			return inst.I{}, err
-		}
-		in.MacroArgs = append(in.MacroArgs, s)
-		if !lp.Consume(",") {
-			break
-		}
-	}
-
-	return in, nil
-}
-
 // ParseMacroArg parses a single macro argument. We expect to be looking at the first
 // character of a macro argument.
 func (a *Base) ParseMacroArg(in inst.I, lp *lines.Parse) (string, error) {
 	if lp.Peek() == '"' {
 		return a.ParseQuoted(in, lp)
 	}
-	lp.AcceptUntil(whitespace + ",")
+	lp.AcceptUntil(Whitespace + ",")
 	return lp.Emit(), nil
 }
 
@@ -260,7 +244,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 	}
 
 	// Nothing else on the line? Must be MODE_A
-	lp.AcceptRun(whitespace)
+	lp.AcceptRun(Whitespace)
 	ws := lp.Emit()
 	atEnd := false
 	if a.SpacesForComment != 0 && len(ws) >= a.SpacesForComment {
@@ -355,7 +339,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 }
 
 func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
@@ -369,7 +353,7 @@ func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	a.SetAsciiVariation(&in, lp)
 	var invert, invertLast byte
 	switch in.Var {
@@ -385,7 +369,7 @@ func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 		panic(fmt.Sprintf("ParseAscii with weird Variation: %d", in.Var))
 	}
 	delim := lp.Next()
-	if delim == lines.Eol || strings.IndexRune(whitespace, delim) >= 0 {
+	if delim == lines.Eol || strings.IndexRune(Whitespace, delim) >= 0 {
 		return inst.I{}, in.Errorf("%s expects delimeter, found '%s'", in.Command, delim)
 	}
 	lp.Ignore()
@@ -406,7 +390,7 @@ func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	ex, err := a.ParseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
@@ -416,7 +400,7 @@ func (a *Base) ParseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseData(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	for {
 		ex, err := a.ParseExpression(in, lp)
 		if err != nil {
@@ -431,7 +415,7 @@ func (a *Base) ParseData(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
@@ -445,7 +429,7 @@ func (a *Base) ParseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
 		return inst.I{}, err
@@ -459,7 +443,7 @@ func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.AcceptRun(whitespace)
+	lp.AcceptRun(Whitespace)
 	for {
 		lp.Ignore()
 		if !lp.AcceptRun(hexdigits) {
@@ -484,7 +468,7 @@ func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
+	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(fileChars) {
 		return inst.I{}, in.Errorf("Expecting filename, found '%c'", lp.Next())
 	}
@@ -497,8 +481,8 @@ func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
-	lp.IgnoreRun(whitespace)
-	if !lp.AcceptRun(macroNameChars) {
+	lp.IgnoreRun(Whitespace)
+	if !lp.AcceptRun(cmdChars) {
 		return inst.I{}, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
