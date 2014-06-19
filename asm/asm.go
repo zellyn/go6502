@@ -165,6 +165,7 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 		in2, err := a.Flavor.ParseInstr(line)
 		if err == nil && in2.Type == inst.TypeMacroEnd {
 			a.Macros[m.Name] = m
+			a.Flavor.AddMacroName(m.Name)
 			return nil
 		}
 		m.Lines = append(m.Lines, line.Parse.Text())
