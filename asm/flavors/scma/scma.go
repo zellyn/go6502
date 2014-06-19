@@ -26,6 +26,8 @@ func New() *SCMA {
 	a.SpacesForComment = 2
 	a.MsbChars = "/"
 	a.ImmediateChars = "#"
+	a.CharChars = "'"
+	a.MacroArgSep = ","
 
 	a.Directives = map[string]oldschool.DirectiveInfo{
 		".IN":   {inst.TypeInclude, a.ParseInclude, 0},

@@ -22,7 +22,6 @@ const hexdigits = Digits + "abcdefABCDEF"
 const Whitespace = " \t"
 const cmdChars = Letters + Digits + ".>_"
 const fileChars = Letters + Digits + "."
-const operatorChars = "+-*/<>="
 
 type DirectiveInfo struct {
 	Type inst.Type
@@ -59,6 +58,10 @@ type Base struct {
 	ExtraCommenty     func(string) bool
 	SetAsciiVariation func(*inst.I, *lines.Parse)
 	ParseMacroCall    func(inst.I, *lines.Parse) (inst.I, bool, error)
+	operatorChars     string
+	CharChars         string
+	InvCharChars      string
+	MacroArgSep       string
 }
 
 // Parse an entire instruction, or return an appropriate error.
@@ -195,7 +198,7 @@ func (a *Base) ParseMacroArg(in inst.I, lp *lines.Parse) (string, error) {
 	if lp.Peek() == '"' {
 		return a.ParseQuoted(in, lp)
 	}
-	lp.AcceptUntil(Whitespace + ",")
+	lp.AcceptUntil(Whitespace + a.MacroArgSep)
 	return lp.Emit(), nil
 }
 
@@ -480,12 +483,23 @@ func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
+// For assemblers where the macro name follows the macro directive.
 func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(cmdChars) {
 		return inst.I{}, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
+	in.WidthKnown = true
+	in.MinWidth = 0
+	in.MaxWidth = 0
+	in.Final = true
+	return in, nil
+}
+
+// For assemblers where the macro name is the label, followed by the directive.
+func (a *Base) MarkMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
+	in.TextArg, in.Label = in.Label, ""
 	in.WidthKnown = true
 	in.MinWidth = 0
 	in.MaxWidth = 0
@@ -506,6 +520,13 @@ func (a *Base) ParseNotImplemented(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
+
+	if a.operatorChars == "" {
+		for k, _ := range a.Operators {
+			a.operatorChars += k
+		}
+	}
+
 	var outer *expr.E
 	if lp.AcceptRun(a.MsbChars + a.LsbChars + a.ImmediateChars) {
 		pc := lp.Emit()
@@ -539,7 +560,7 @@ func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
 		return &expr.E{}, err
 	}
 
-	for lp.Accept(operatorChars) {
+	for lp.Accept(a.operatorChars) {
 		c := lp.Emit()
 		right, err := a.ParseTerm(in, lp)
 		if err != nil {
@@ -587,7 +608,7 @@ func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 		return top, nil
 	}
 
-	// Hex
+	// Binary
 	if lp.Consume(string(a.BinaryChar)) {
 		if !lp.AcceptRun(binarydigits) {
 			c := lp.Next()
@@ -616,14 +637,19 @@ func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 	}
 
 	// Character
-	if lp.Consume("'") {
+	allChars := a.CharChars + a.InvCharChars
+	if allChars != "" && lp.Accept(allChars) {
+		quote := lp.Emit()
 		c := lp.Next()
 		if c == lines.Eol {
 			return &expr.E{}, in.Errorf("end of line after quote")
 		}
 		ex.Op = expr.OpLeaf
 		ex.Val = uint16(c)
-		lp.Consume("'") // optional closing quote
+		if strings.Contains(a.InvCharChars, quote[:1]) {
+			ex.Val |= 0x80
+		}
+		lp.Consume(quote) // optional closing quote
 		lp.Ignore()
 		return top, nil
 	}

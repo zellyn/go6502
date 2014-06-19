@@ -19,6 +19,7 @@ type Merlin struct {
 }
 
 const whitespace = " \t"
+const macroNameChars = oldschool.Letters + oldschool.Digits + "_"
 
 func New() *Merlin {
 	m := &Merlin{}
@@ -32,6 +33,9 @@ func New() *Merlin {
 	m.MsbChars = ">/"
 	m.ImmediateChars = "#"
 	m.HexCommas = oldschool.ReqOptional
+	m.CharChars = "'"
+	m.InvCharChars = `"`
+	m.MacroArgSep = ";"
 
 	m.Directives = map[string]oldschool.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, m.ParseAddress, 0},
@@ -47,9 +51,9 @@ func New() *Merlin {
 		".DO":    {inst.TypeIfdef, m.ParseDo, 0},
 		".ELSE":  {inst.TypeIfdefElse, m.ParseNoArgDir, 0},
 		".FIN":   {inst.TypeIfdefEnd, m.ParseNoArgDir, 0},
-		".MA":    {inst.TypeMacroStart, m.ParseMacroStart, 0},
-		".EM":    {inst.TypeMacroEnd, m.ParseNoArgDir, 0},
-		".US":    {inst.TypeNone, m.ParseNotImplemented, 0},
+		"MAC":    {inst.TypeMacroStart, m.MarkMacroStart, 0},
+		"EOM":    {inst.TypeMacroEnd, m.ParseNoArgDir, 0},
+		"<<<":    {inst.TypeMacroEnd, m.ParseNoArgDir, 0},
 		"PAGE":   {inst.TypeNone, nil, 0}, // New page
 		"TTL":    {inst.TypeNone, nil, 0}, // Title
 		"SAV":    {inst.TypeNone, nil, 0}, // Save
@@ -65,6 +69,9 @@ func New() *Merlin {
 		"<": expr.OpLt,
 		">": expr.OpGt,
 		"=": expr.OpEq,
+		".": expr.OpOr,
+		"&": expr.OpAnd,
+		"!": expr.OpXor,
 	}
 
 	m.SetOnOffDefaults(map[string]bool{
@@ -92,6 +99,55 @@ func New() *Merlin {
 		case invert && invertLast:
 			in.Var = inst.DataAsciiHiFlip
 		}
+	}
+
+	// ParseMacroCall parses a macro call. We expect in.Command to hold
+	// the "command column" value, which caused isMacroCall to return
+	// true, and the lp to be pointing to the following character
+	// (probably whitespace).
+	m.ParseMacroCall = func(in inst.I, lp *lines.Parse) (inst.I, bool, error) {
+		if in.Command == "" {
+			return in, false, nil
+		}
+		byName := m.HasMacroName(in.Command)
+
+		// It's not a macro call.
+		if in.Command != ">>>" && in.Command != "PMC" && !byName {
+			return in, false, nil
+		}
+
+		in.Type = inst.TypeMacroCall
+		lp.IgnoreRun(oldschool.Whitespace)
+		if !byName {
+			if !lp.AcceptRun(macroNameChars) {
+				c := lp.Next()
+				return in, true, in.Errorf("Expected macro name, got char '%c'", c)
+			}
+			in.Command = lp.Emit()
+			if !m.HasMacroName(in.Command) {
+				return in, true, in.Errorf("Unknown macro: '%s'", in.Command)
+			}
+			if !lp.Consume(" ./,-(") {
+				c := lp.Next()
+				if c == lines.Eol || c == ';' {
+					return in, true, nil
+				}
+				return in, true, in.Errorf("Expected macro name/args separator [ ./,-(], got '%c'", c)
+
+			}
+		}
+		for {
+			s, err := m.ParseMacroArg(in, lp)
+			if err != nil {
+				return inst.I{}, true, err
+			}
+			in.MacroArgs = append(in.MacroArgs, s)
+			if !lp.Consume(";") {
+				break
+			}
+		}
+
+		return in, true, nil
 	}
 
 	return m

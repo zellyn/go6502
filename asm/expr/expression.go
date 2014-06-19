@@ -31,6 +31,9 @@ const (
 	OpGt               // Greater than
 	OpEq               // Equal to
 	OpByte             // A single byte of storage
+	OpAnd
+	OpOr
+	OpXor
 )
 
 var OpStrings = map[Operator]string{
@@ -44,6 +47,9 @@ var OpStrings = map[Operator]string{
 	OpLt:    "<",
 	OpGt:    ">",
 	OpEq:    "=",
+	OpAnd:   "&",
+	OpOr:    "|",
+	OpXor:   "^",
 }
 
 type E struct {
@@ -62,7 +68,7 @@ func (e E) String() string {
 		}
 		return fmt.Sprintf("$%04x", e.Val)
 
-	case OpPlus, OpMinus, OpMul, OpDiv, OpLsb, OpMsb, OpByte, OpLt, OpGt, OpEq:
+	case OpPlus, OpMinus, OpMul, OpDiv, OpLsb, OpMsb, OpByte, OpLt, OpGt, OpEq, OpAnd, OpOr, OpXor:
 		if e.Right != nil {
 			return fmt.Sprintf("(%s %s %s)", OpStrings[e.Op], *e.Left, *e.Right)
 		}
@@ -142,7 +148,7 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 		return l & 0xff, nil
 	case OpByte:
 		return e.Val, nil
-	case OpPlus, OpMul, OpDiv, OpLt, OpGt, OpEq:
+	case OpPlus, OpMul, OpDiv, OpLt, OpGt, OpEq, OpAnd, OpOr, OpXor:
 		l, err := e.Left.Eval(ctx, ln)
 		if err != nil {
 			return 0, err
@@ -176,6 +182,12 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 				return ctx.Zero()
 			}
 			return l / r, nil
+		case OpAnd:
+			return l & r, nil
+		case OpOr:
+			return l | r, nil
+		case OpXor:
+			return l ^ r, nil
 		}
 		panic(fmt.Sprintf("bad code - missing switch case: %d", e.Op))
 	}
