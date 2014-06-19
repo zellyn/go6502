@@ -20,7 +20,7 @@ const Digits = "0123456789"
 const binarydigits = "01"
 const hexdigits = Digits + "abcdefABCDEF"
 const Whitespace = " \t"
-const cmdChars = Letters + Digits + ".>_"
+const cmdChars = Letters + Digits + ".<>_:@"
 const fileChars = Letters + Digits + "."
 
 type DirectiveInfo struct {
@@ -50,6 +50,7 @@ type Base struct {
 	HexCommas         Requiredness
 	SpacesForComment  int  // this many spaces after command means it's the comment field
 	StringEndOptional bool // can omit closing delimeter from string args?
+	SuffixForWide     bool // is eg. "LDA:" a force-wide on "LDA"? (Merlin)
 	CommentChar       rune
 	BinaryChar        rune
 	MsbChars          string
@@ -166,7 +167,17 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 
 	if summary, ok := opcodes.ByName[in.Command]; ok {
 		in.Type = inst.TypeOp
-		return a.ParseOpArgs(in, lp, summary)
+		return a.ParseOpArgs(in, lp, summary, false)
+	}
+
+	// Merlin lets you say "LDA:" or "LDA@" or "LDAZ" to force non-zero-page.
+	if a.SuffixForWide {
+		prefix := in.Command[:len(in.Command)-1]
+		if summary, ok := opcodes.ByName[prefix]; ok {
+			in.Command = prefix
+			in.Type = inst.TypeOp
+			return a.ParseOpArgs(in, lp, summary, true)
+		}
 	}
 
 	return inst.I{}, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
@@ -229,9 +240,9 @@ func (a *Base) ParseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 	return strings.Replace(s, `""`, `"`, -1), nil
 }
 
-// ParseOpArgs parses the arguments to an assembly op. We expect to be looking at the first
-// non-op character (probably whitespace)
-func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary) (inst.I, error) {
+// ParseOpArgs parses the arguments to an assembly op. We expect to be
+// looking at the first non-op character (probably whitespace)
+func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
 	i := inst.I{}
 
 	// MODE_IMPLIED: we don't really care what comes next: it's a comment.
@@ -338,7 +349,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 		}
 	}
 
-	return common.DecodeOp(a, in, summary, indirect, xy)
+	return common.DecodeOp(a, in, summary, indirect, xy, forceWide)
 }
 
 func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {

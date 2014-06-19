@@ -36,6 +36,7 @@ func New() *Merlin {
 	m.CharChars = "'"
 	m.InvCharChars = `"`
 	m.MacroArgSep = ";"
+	m.SuffixForWide = true
 
 	m.Directives = map[string]oldschool.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, m.ParseAddress, 0},
