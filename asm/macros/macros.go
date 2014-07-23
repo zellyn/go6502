@@ -7,14 +7,15 @@ import (
 )
 
 type M struct {
-	Name  string
-	Args  []string
-	Lines []string
+	Name   string
+	Args   []string
+	Lines  []string
+	Locals map[string]bool // labels that should be scoped to macro invocation
 }
 
 func (m M) LineSource(flavor flavors.F, in inst.I, macroCall int) (lines.LineSource, error) {
 	var ls []string
-	context := lines.Context{Filename: "macro:" + m.Name, Parent: in.Line, MacroCall: macroCall}
+	context := lines.Context{Filename: "macro:" + m.Name, Parent: in.Line, MacroCall: macroCall, MacroLocals: m.Locals}
 	for _, line := range m.Lines {
 		// TODO(zellyn): implement named macro args
 		subbed, err := flavor.ReplaceMacroArgs(line, in.MacroArgs, nil)

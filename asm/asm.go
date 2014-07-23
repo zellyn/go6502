@@ -154,6 +154,9 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 		Name: in.TextArg,
 		Args: in.MacroArgs,
 	}
+	if a.Flavor.LocalMacroLabels() {
+		m.Locals = make(map[string]bool)
+	}
 	for {
 		line, done, err := ls.Next()
 		if err != nil {
@@ -163,6 +166,9 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 			return in.Errorf("end of file while reading macro %s", m.Name)
 		}
 		in2, err := a.Flavor.ParseInstr(line)
+		if a.Flavor.LocalMacroLabels() && in2.Label != "" {
+			m.Locals[in2.Label] = true
+		}
 		if err == nil && in2.Type == inst.TypeMacroEnd {
 			a.Macros[m.Name] = m
 			a.Flavor.AddMacroName(m.Name)

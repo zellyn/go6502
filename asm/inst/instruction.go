@@ -223,8 +223,9 @@ func (i *I) Compute(c context.Context, setWidth bool, final bool) (bool, error) 
 // FixLabels attempts to turn .1 into LAST_LABEL.1, etc.
 func (i *I) FixLabels(labeler context.Labeler) error {
 	macroCall := i.Line.GetMacroCall()
+	macroLocals := i.Line.GetMacroLocals()
 	parent := labeler.IsNewParentLabel(i.Label)
-	newL, err := labeler.FixLabel(i.Label, macroCall)
+	newL, err := labeler.FixLabel(i.Label, macroCall, macroLocals)
 	if err != nil {
 		return i.Errorf("%v", err)
 	}
@@ -234,7 +235,7 @@ func (i *I) FixLabels(labeler context.Labeler) error {
 	}
 
 	for _, e := range i.Exprs {
-		if err := e.FixLabels(labeler, macroCall, i.Line); err != nil {
+		if err := e.FixLabels(labeler, macroCall, macroLocals, i.Line); err != nil {
 			return err
 		}
 	}

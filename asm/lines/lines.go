@@ -3,9 +3,10 @@ package lines
 import "fmt"
 
 type Context struct {
-	Filename  string // Pointer to the filename
-	Parent    *Line  // Pointer to parent line (eg. include, macro)
-	MacroCall int
+	Filename    string // Pointer to the filename
+	Parent      *Line  // Pointer to parent line (eg. include, macro)
+	MacroCall   int
+	MacroLocals map[string]bool
 }
 
 type Line struct {
@@ -43,6 +44,13 @@ func (c *Context) GetMacroCall() int {
 		return c.MacroCall
 	}
 	return c.Parent.GetMacroCall()
+}
+
+func (l *Line) GetMacroLocals() map[string]bool {
+	if l == nil || l.Context == nil {
+		return nil
+	}
+	return l.Context.MacroLocals
 }
 
 func (l *Line) GetMacroCall() int {

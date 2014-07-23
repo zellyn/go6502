@@ -74,14 +74,14 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 	if lp.AcceptRun(Digits) {
 		s := lp.Emit()
 		if len(s) != 4 {
-			return inst.I{}, line.Errorf("line number must be exactly 4 digits: %s", s)
+			return in, line.Errorf("line number must be exactly 4 digits: %s", s)
 		}
 		if !lp.Consume(" ") && lp.Peek() != lines.Eol {
-			return inst.I{}, line.Errorf("line number (%s) followed by non-space", s)
+			return in, line.Errorf("line number (%s) followed by non-space", s)
 		}
 		i, err := strconv.ParseUint(s, 10, 16)
 		if err != nil {
-			return inst.I{}, line.Errorf("invalid line number: %s: %s", s, err)
+			return in, line.Errorf("invalid line number: %s: %s", s, err)
 		}
 		in.DeclaredLine = uint16(i)
 	}
@@ -107,7 +107,7 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 		switch a.LabelColons {
 		case ReqRequired:
 			if !lp.Consume(":") {
-				return inst.I{}, line.Errorf("label '%s' must end in colon", in.Label)
+				return in, line.Errorf("label '%s' must end in colon", in.Label)
 			}
 		case ReqOptional:
 			lp.Consume(":")
@@ -137,7 +137,7 @@ func (a *Base) SetWidthsOnFirstPass() bool {
 func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 	if !lp.AcceptRun(cmdChars) && !(a.Directives["="].Func != nil && lp.Accept("=")) {
 		c := lp.Next()
-		return inst.I{}, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
+		return in, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
 	}
 	in.Command = lp.Emit()
 
@@ -145,7 +145,7 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 	if a.ParseMacroCall != nil {
 		i, isMacro, err := a.ParseMacroCall(in, lp)
 		if err != nil {
-			return inst.I{}, err
+			return in, err
 		}
 		if isMacro {
 			return i, nil
@@ -180,7 +180,7 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 		}
 	}
 
-	return inst.I{}, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
+	return in, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
 }
 
 func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
@@ -188,7 +188,7 @@ func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(Letters) {
 		c := lp.Next()
-		return inst.I{}, in.Errorf("expecting ON/OFF, found '%s'", c)
+		return in, in.Errorf("expecting ON/OFF, found '%s'", c)
 	}
 	in.TextArg = lp.Emit()
 	switch in.TextArg {
@@ -197,7 +197,7 @@ func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 	case "OFF":
 		a.SettingOff(in.Command)
 	default:
-		return inst.I{}, in.Errorf("expecting ON/OFF, found '%s'", in.TextArg)
+		return in, in.Errorf("expecting ON/OFF, found '%s'", in.TextArg)
 	}
 	return in, nil
 
@@ -243,8 +243,6 @@ func (a *Base) ParseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 // ParseOpArgs parses the arguments to an assembly op. We expect to be
 // looking at the first non-op character (probably whitespace)
 func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
-	i := inst.I{}
-
 	// MODE_IMPLIED: we don't really care what comes next: it's a comment.
 	if summary.Modes == opcodes.MODE_IMPLIED {
 		op := summary.Ops[0]
@@ -271,7 +269,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 	if atEnd {
 		// Nothing left on line except comments.
 		if !summary.AnyModes(opcodes.MODE_A) {
-			return i, in.Errorf("%s with no arguments", in.Command)
+			return in, in.Errorf("%s with no arguments", in.Command)
 		}
 		op, ok := summary.OpForMode(opcodes.MODE_A)
 		if !ok {
@@ -288,20 +286,20 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 
 	indirect := lp.Consume("(")
 	if indirect && !summary.AnyModes(opcodes.MODE_INDIRECT_ANY) {
-		return i, in.Errorf("%s doesn't support any indirect modes", in.Command)
+		return in, in.Errorf("%s doesn't support any indirect modes", in.Command)
 	}
 	xy := '-'
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
-		return i, err
+		return in, err
 	}
 	if !indirect && (expr.Text == "a" || expr.Text == "A") {
 		if !summary.AnyModes(opcodes.MODE_A) {
-			return i, in.Errorf("%s doesn't support A mode", in.Command)
+			return in, in.Errorf("%s doesn't support A mode", in.Command)
 		}
 		switch a.ExplicitARegister {
 		case ReqDisallowed:
-			return i, in.Errorf("Assembler flavor doesn't support A mode", in.Command)
+			return in, in.Errorf("Assembler flavor doesn't support A mode", in.Command)
 		case ReqOptional, ReqRequired:
 			op, ok := summary.OpForMode(opcodes.MODE_A)
 			if !ok {
@@ -325,25 +323,25 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 			xy = 'x'
 		} else if lp.Consume("yY") {
 			if indirect {
-				return i, in.Errorf(",Y unexpected inside parens")
+				return in, in.Errorf(",Y unexpected inside parens")
 			}
 			xy = 'y'
 		} else {
-			return i, in.Errorf("X or Y expected after comma")
+			return in, in.Errorf("X or Y expected after comma")
 		}
 	}
 	comma2 := false
 	if indirect {
 		if !lp.Consume(")") {
-			return i, in.Errorf("Expected closing paren")
+			return in, in.Errorf("Expected closing paren")
 		}
 		comma2 = lp.Consume(",")
 		if comma2 {
 			if comma {
-				return i, in.Errorf("Cannot have ,X or ,Y twice.")
+				return in, in.Errorf("Cannot have ,X or ,Y twice.")
 			}
 			if !lp.Consume("yY") {
-				return i, in.Errorf("Only ,Y can follow parens.")
+				return in, in.Errorf("Only ,Y can follow parens.")
 			}
 			xy = 'y'
 		}
@@ -356,7 +354,7 @@ func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
-		return inst.I{}, err
+		return in, err
 	}
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
@@ -384,13 +382,13 @@ func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	delim := lp.Next()
 	if delim == lines.Eol || strings.IndexRune(Whitespace, delim) >= 0 {
-		return inst.I{}, in.Errorf("%s expects delimeter, found '%s'", in.Command, delim)
+		return in, in.Errorf("%s expects delimeter, found '%s'", in.Command, delim)
 	}
 	lp.Ignore()
 	lp.AcceptUntil(string(delim))
 	delim2 := lp.Next()
 	if delim != delim2 && !(delim2 == lines.Eol && a.StringEndOptional) {
-		return inst.I{}, in.Errorf("%s: expected closing delimeter '%s'; got '%s'", in.Command, delim, delim2)
+		return in, in.Errorf("%s: expected closing delimeter '%s'; got '%s'", in.Command, delim, delim2)
 	}
 	lp.Backup()
 	in.Data = []byte(lp.Emit())
@@ -407,7 +405,7 @@ func (a *Base) ParseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	ex, err := a.ParseExpression(in, lp)
 	if err != nil {
-		return inst.I{}, err
+		return in, err
 	}
 	in.Exprs = append(in.Exprs, ex)
 	return in, nil
@@ -418,7 +416,7 @@ func (a *Base) ParseData(in inst.I, lp *lines.Parse) (inst.I, error) {
 	for {
 		ex, err := a.ParseExpression(in, lp)
 		if err != nil {
-			return inst.I{}, err
+			return in, err
 		}
 		in.Exprs = append(in.Exprs, ex)
 		if !lp.Consume(",") {
@@ -432,7 +430,7 @@ func (a *Base) ParseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
-		return inst.I{}, err
+		return in, err
 	}
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
@@ -446,7 +444,7 @@ func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	expr, err := a.ParseExpression(in, lp)
 	if err != nil {
-		return inst.I{}, err
+		return in, err
 	}
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
@@ -461,15 +459,15 @@ func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
 	for {
 		lp.Ignore()
 		if !lp.AcceptRun(hexdigits) {
-			return inst.I{}, in.Errorf("%s expects hex digits; got '%s'", in.Command, lp.Next())
+			return in, in.Errorf("%s expects hex digits; got '%s'", in.Command, lp.Next())
 		}
 		hs := lp.Emit()
 		if len(hs)%2 != 0 {
-			return inst.I{}, in.Errorf("%s expects pairs of hex digits; got %d", in.Command, len(hs))
+			return in, in.Errorf("%s expects pairs of hex digits; got %d", in.Command, len(hs))
 		}
 		data, err := hex.DecodeString(hs)
 		if err != nil {
-			return inst.I{}, in.Errorf("%s: error decoding hex string: %s", in.Command, err)
+			return in, in.Errorf("%s: error decoding hex string: %s", in.Command, err)
 		}
 		in.Data = append(in.Data, data...)
 
@@ -484,7 +482,7 @@ func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
 func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(fileChars) {
-		return inst.I{}, in.Errorf("Expecting filename, found '%c'", lp.Next())
+		return in, in.Errorf("Expecting filename, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
 	in.WidthKnown = true
@@ -498,7 +496,7 @@ func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(cmdChars) {
-		return inst.I{}, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
+		return in, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
 	in.WidthKnown = true
@@ -527,7 +525,7 @@ func (a *Base) ParseNoArgDir(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 func (a *Base) ParseNotImplemented(in inst.I, lp *lines.Parse) (inst.I, error) {
-	return inst.I{}, in.Errorf("not implemented (yet?): %s", in.Command)
+	return in, in.Errorf("not implemented (yet?): %s", in.Command)
 }
 
 func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
@@ -679,22 +677,23 @@ func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 var macroArgRe = regexp.MustCompile("][0-9]+")
 
 func (a *Base) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
+	var err error
 	line = strings.Replace(line, "]#", strconv.Itoa(len(args)), -1)
 	line = string(macroArgRe.ReplaceAllFunc([]byte(line), func(in []byte) []byte {
 		n, _ := strconv.Atoi(string(in[1:]))
 		if n > 0 && n <= len(args) {
 			return []byte(args[n-1])
 		}
-		return []byte{}
+		return in
 	}))
-	return line, nil
+	return line, err
 }
 
 func (a *Base) IsNewParentLabel(label string) bool {
 	return label != "" && label[0] != '.'
 }
 
-func (a *Base) FixLabel(label string, macroCall int) (string, error) {
+func (a *Base) FixLabel(label string, macroCall int, locals map[string]bool) (string, error) {
 	switch {
 	case label == "":
 		return label, nil

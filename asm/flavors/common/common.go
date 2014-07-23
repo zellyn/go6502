@@ -11,7 +11,6 @@ import (
 // DecodeOp contains the common code that decodes an Opcode, once we
 // have fully parsed it.
 func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect bool, xy rune, forceWide bool) (inst.I, error) {
-	i := inst.I{}
 	ex := in.Exprs[0]
 
 	// At this point we've parsed the Opcode. Let's see if it makes sense.
@@ -20,10 +19,10 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		case 'x':
 			op, ok := summary.OpForMode(opcodes.MODE_INDIRECT_X)
 			if !ok {
-				return i, in.Errorf("%s doesn't support indexed indirect (addr,X) mode", in.Command)
+				return in, in.Errorf("%s doesn't support indexed indirect (addr,X) mode", in.Command)
 			}
 			if forceWide {
-				return i, in.Errorf("%s (addr,X) doesn't have a wide variant", in.Command)
+				return in, in.Errorf("%s (addr,X) doesn't have a wide variant", in.Command)
 			}
 			in.Op = op.Byte
 			in.WidthKnown = true
@@ -34,10 +33,10 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		case 'y':
 			op, ok := summary.OpForMode(opcodes.MODE_INDIRECT_Y)
 			if !ok {
-				return i, in.Errorf("%s doesn't support indirect indexed (addr),Y mode", in.Command)
+				return in, in.Errorf("%s doesn't support indirect indexed (addr),Y mode", in.Command)
 			}
 			if forceWide {
-				return i, fmt.Errorf("%s (addr),Y doesn't have a wide variant", in.Command)
+				return in, fmt.Errorf("%s (addr),Y doesn't have a wide variant", in.Command)
 			}
 			in.WidthKnown = true
 			in.MinWidth = 2
@@ -48,7 +47,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		default:
 			op, ok := summary.OpForMode(opcodes.MODE_INDIRECT)
 			if !ok {
-				return i, in.Errorf("%s doesn't support indirect (addr) mode", in.Command)
+				return in, in.Errorf("%s doesn't support indirect (addr) mode", in.Command)
 			}
 			in.Op = op.Byte
 			in.WidthKnown = true
@@ -66,7 +65,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			panic(fmt.Sprintf("opcode error: %s has no MODE_RELATIVE opcode", in.Command))
 		}
 		if forceWide {
-			return i, fmt.Errorf("%s doesn't have a wide variant", in.Command)
+			return in, fmt.Errorf("%s doesn't have a wide variant", in.Command)
 		}
 
 		in.Op = op.Byte
@@ -109,7 +108,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 	opZp, zpOk := summary.OpForMode(zp)
 
 	if !summary.AnyModes(zp | wide) {
-		return i, in.Errorf("%s opcode doesn't support %s or %s modes.", zpS, wideS)
+		return in, in.Errorf("%s opcode doesn't support %s or %s modes.", zpS, wideS)
 	}
 
 	if !summary.AnyModes(zp) {
@@ -128,7 +127,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			panic(fmt.Sprintf("opcode error: %s has no %s opcode", in.Command, zpS))
 		}
 		if forceWide {
-			return i, fmt.Errorf("%s doesn't have a wide variant", in.Command)
+			return in, fmt.Errorf("%s doesn't have a wide variant", in.Command)
 		}
 		in.Op = opZp.Byte
 		in.WidthKnown = true

@@ -100,7 +100,7 @@ func New() *SCMA {
 		for {
 			s, err := a.ParseMacroArg(in, lp)
 			if err != nil {
-				return inst.I{}, true, err
+				return in, true, err
 			}
 			in.MacroArgs = append(in.MacroArgs, s)
 			if !lp.Consume(",") {
@@ -116,4 +116,8 @@ func New() *SCMA {
 
 func (a *SCMA) Zero() (uint16, error) {
 	return uint16(0xffff), nil
+}
+
+func (a *SCMA) LocalMacroLabels() bool {
+	return false
 }

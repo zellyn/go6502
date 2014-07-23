@@ -94,3 +94,7 @@ func newRedbook() *RedBook {
 
 	return r
 }
+
+func (r *RedBook) LocalMacroLabels() bool {
+	return false
+}

@@ -140,7 +140,7 @@ func New() *Merlin {
 		for {
 			s, err := m.ParseMacroArg(in, lp)
 			if err != nil {
-				return inst.I{}, true, err
+				return in, true, err
 			}
 			in.MacroArgs = append(in.MacroArgs, s)
 			if !lp.Consume(";") {
@@ -177,7 +177,7 @@ func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 		filename = strings.TrimSpace(filename[1:])
 	}
 	if filename == "" {
-		return inst.I{}, in.Errorf("%s expects filename", in.Command)
+		return in, in.Errorf("%s expects filename", in.Command)
 	}
 	in.TextArg = prefix + filename
 	in.WidthKnown = true
@@ -187,15 +187,11 @@ func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (m *Merlin) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
-	panic("Merlin.ReplaceMacroArgs not implemented yet.")
-}
-
 func (m *Merlin) IsNewParentLabel(label string) bool {
 	return label != "" && label[0] != ':'
 }
 
-func (m *Merlin) FixLabel(label string, macroCount int) (string, error) {
+func (m *Merlin) FixLabel(label string, macroCount int, locals map[string]bool) (string, error) {
 	switch {
 	case label == "":
 		return label, nil
@@ -205,6 +201,13 @@ func (m *Merlin) FixLabel(label string, macroCount int) (string, error) {
 		} else {
 			return fmt.Sprintf("%s/%s", last, label), nil
 		}
+	case locals[label]:
+		return fmt.Sprintf("%s{%d}", label, macroCount), nil
+
 	}
 	return label, nil
+}
+
+func (m *Merlin) LocalMacroLabels() bool {
+	return true
 }

@@ -45,6 +45,10 @@ func (a *AS65) IsNewParentLabel(label string) bool {
 	return label != "" && label[0] != '.'
 }
 
-func (a *AS65) FixLabel(label string, macroCall int) (string, error) {
+func (a *AS65) FixLabel(label string, macroCall int, locals map[string]bool) (string, error) {
 	panic("AS65.FixLabel not implemented yet.")
+}
+
+func (a *AS65) LocalMacroLabels() bool {
+	return false
 }

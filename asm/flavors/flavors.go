@@ -11,6 +11,7 @@ type F interface {
 	DefaultOrigin() (uint16, error)
 	SetWidthsOnFirstPass() bool
 	ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error)
+	LocalMacroLabels() bool
 	context.Context
 	context.Labeler
 }
