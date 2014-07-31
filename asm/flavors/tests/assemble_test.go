@@ -249,6 +249,43 @@ func TestMultiline(t *testing.T) {
 			"    PMC M1($43;$44",
 			"    M1 $44",
 		}, nil, "eae642d000eae643d000eae644d000ea", nil, true},
+
+		// Merlin: macros in other files
+		{mm, "macro in include", []string{
+			" ORG $E000",
+			" USE MACROS",
+			"PROMPT = $0033",
+			" INCW PROMPT",
+			" NOP",
+		}, map[string][]string{
+			"T.MACROS": {
+				"* Increment word",
+				"INCW     MAC",
+				"         INC ]1",
+				"         BNE INCW_END",
+				"         INC ]1+1",
+				"INCW_END EOM",
+			},
+		}, "e633d002e634ea", nil, true},
+
+		// Merlin: macros override the 3+1 zero-page rule
+		{mm, "macro vs zero page override", []string{
+			" USE MACROS",
+			"A1 = $0033",
+			"A2 = $0035",
+			" CMPW A1;A2",
+			" NOP",
+		}, map[string][]string{
+			"T.MACROS": {
+				"* Compare word",
+				"CMPW     MAC",
+				"         LDA ]1",
+				"         CMP ]2",
+				"         LDA ]1+1",
+				"         SBC ]2+1",
+				"         EOM",
+			},
+		}, "a533c535a534e536ea", nil, true},
 	}
 
 	for i, tt := range tests {

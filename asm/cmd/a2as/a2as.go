@@ -81,7 +81,6 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error trying to determine prefix length for file '%s'", *infile, err)
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "Prefix guessed to be %d\n", p)
 	}
 
 	if err := a.AssembleWithPrefix(*infile, p); err != nil {

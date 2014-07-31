@@ -373,7 +373,10 @@ func (i *I) computeMustKnow(c context.Context, setWidth bool, final bool) (bool,
 func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error) {
 	// If the width is not known, we better have a ZeroPage alternative.
 	if !i.WidthKnown && (i.ZeroOp == 0 || i.ZeroMode == 0) {
-		panic(fmt.Sprintf("Reached computeOp for '%s' with no ZeroPage alternative, i.Command"))
+		if i.Line.Context != nil && i.Line.Context.Parent != nil {
+			fmt.Println(i.Line.Context.Parent.Sprintf("foo"))
+		}
+		panic(i.Sprintf("Reached computeOp for '%s' with no ZeroPage alternative: %#v [%s]", i.Command, i, i.Line.Text()))
 	}
 	// An op with no args would be final already, so we must have an Expression.
 	if len(i.Exprs) == 0 {

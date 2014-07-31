@@ -13,7 +13,7 @@ type M struct {
 	Locals map[string]bool // labels that should be scoped to macro invocation
 }
 
-func (m M) LineSource(flavor flavors.F, in inst.I, macroCall int) (lines.LineSource, error) {
+func (m M) LineSource(flavor flavors.F, in inst.I, macroCall int, prefix int) (lines.LineSource, error) {
 	var ls []string
 	context := lines.Context{Filename: "macro:" + m.Name, Parent: in.Line, MacroCall: macroCall, MacroLocals: m.Locals}
 	for _, line := range m.Lines {
@@ -24,5 +24,5 @@ func (m M) LineSource(flavor flavors.F, in inst.I, macroCall int) (lines.LineSou
 		}
 		ls = append(ls, subbed)
 	}
-	return lines.NewSimpleLineSource(context, ls, 0), nil
+	return lines.NewSimpleLineSource(context, ls, prefix), nil
 }

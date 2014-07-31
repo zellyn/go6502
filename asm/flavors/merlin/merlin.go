@@ -45,6 +45,7 @@ func New() *Merlin {
 		"=":      {inst.TypeEqu, m.ParseEquate, inst.EquNormal},
 		"HEX":    {inst.TypeData, m.ParseHexString, inst.DataBytes},
 		"DFB":    {inst.TypeData, m.ParseData, inst.DataBytes},
+		"DB":     {inst.TypeData, m.ParseData, inst.DataBytes},
 		"DA":     {inst.TypeData, m.ParseData, inst.DataWordsLe},
 		"DDB":    {inst.TypeData, m.ParseData, inst.DataWordsBe},
 		"ASC":    {inst.TypeData, m.ParseAscii, inst.DataAscii},

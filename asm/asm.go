@@ -44,6 +44,9 @@ func (a *Assembler) Load(filename string, prefix int) error {
 		if err != nil {
 			return err
 		}
+		// if line.Parse != nil {
+		// 	fmt.Fprintf("PLUGH: %s\n", line.Text())
+		// }
 		if done {
 			lineSources = lineSources[1:]
 			continue
@@ -53,6 +56,11 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			// we're in an inactive ifdef branch
 			continue
 		}
+
+		if err != nil {
+			return err
+		}
+
 		if err := in.FixLabels(a.Flavor); err != nil {
 			return err
 		}
@@ -79,7 +87,7 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			if !ok {
 				return in.Errorf(`unknown macro: "%s"`, in.Command)
 			}
-			subLs, err := m.LineSource(a.Flavor, in, macroCall)
+			subLs, err := m.LineSource(a.Flavor, in, macroCall, prefix)
 			if err != nil {
 				return in.Errorf(`error calling macro "%s": %v`, m.Name, err)
 			}
@@ -170,6 +178,7 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 			m.Locals[in2.Label] = true
 		}
 		if err == nil && in2.Type == inst.TypeMacroEnd {
+			m.Lines = append(m.Lines, line.Parse.Text())
 			a.Macros[m.Name] = m
 			a.Flavor.AddMacroName(m.Name)
 			return nil
