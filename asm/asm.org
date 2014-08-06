@@ -79,3 +79,7 @@ SOURCE   FILE #01 =>FOO.TXT
 0003:41 42 43        3           ASC   "ABC"
 0006:                4           MSB   ON
 0006:C1 C2 C3        5           ASC   "ABC"
+
+* Sweet 16
+http://amigan.1emu.net/kolsen/programming/sweet16.html
+http://twimgs.com/informationweek/byte/archive/Apple-II-Description/The-Apple-II-by-Stephen-Wozniak.pdf
