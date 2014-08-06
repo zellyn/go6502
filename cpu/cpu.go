@@ -132,7 +132,7 @@ func (c *cpu) Reset() {
 // status prints out the current CPU instruction and register status.
 func status(c *cpu, m Memory) string {
 	bytes, text, _ := asm.Disasm(c.PC(), m.Read(c.PC()), m.Read(c.PC()+1), m.Read(c.PC()+2))
-	return fmt.Sprintf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b",
+	return fmt.Sprintf("$%04X: %-8s  %-11s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b",
 		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P())
 }
 
