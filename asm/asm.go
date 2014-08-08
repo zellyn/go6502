@@ -65,7 +65,7 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return err
 		}
 
-		if _, err := a.passInst(&in, a.Flavor.SetWidthsOnFirstPass(), false); err != nil {
+		if _, err := a.passInst(&in, false); err != nil {
 			return err
 		}
 
@@ -143,15 +143,8 @@ func (a *Assembler) AssembleWithPrefix(filename string, prefix int) error {
 		return err
 	}
 
-	// Setwidth pass if necessary.
-	if !a.Flavor.SetWidthsOnFirstPass() {
-		if _, err := a.Pass(true, false); err != nil {
-			return err
-		}
-	}
-
 	// Final pass.
-	if _, err := a.Pass(true, true); err != nil {
+	if _, err := a.Pass(true); err != nil {
 		return err
 	}
 	return nil
@@ -198,21 +191,16 @@ func (a *Assembler) initPass() {
 	}
 }
 
-// passInst performs a pass on a single instruction. Depending on
-// whether the instruction width can be determined, it updates or
-// clears the current address. If setWidth is true, it forces the
-// instruction to decide its final width. If final is true, and the
-// instruction cannot be finalized, it returns an error.
-func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, err error) {
+// passInst performs a pass on a single instruction. It forces the
+// instruction to decide its width, but may not know all the
+// arguments. If final is true, and the instruction cannot be
+// finalized, it returns an error.
+func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
 	// fmt.Printf("PLUGH: in.Compute(a.Flavor, true, true) on %s\n", in)
-	isFinal, err = in.Compute(a.Flavor, setWidth, final)
-	// fmt.Printf("PLUGH: isFinal=%v, in.Final=%v, in.WidthKnown=%v, in.MinWidth=%v\n", isFinal, in.Final, in.WidthKnown, in.MinWidth)
+	isFinal, err = in.Compute(a.Flavor, final)
+	// fmt.Printf("PLUGH: isFinal=%v, in.Final=%v, in.WidthKnown=%v, in.Width=%v\n", isFinal, in.Final, in.WidthKnown, in.Width)
 	if err != nil {
 		return false, err
-	}
-
-	if in.WidthKnown && in.MinWidth != in.MaxWidth {
-		panic(fmt.Sprintf("inst.I %s: WidthKnown=true, but MinWidth=%d, MaxWidth=%d", in, in.MinWidth, in.MaxWidth))
 	}
 
 	// Update address
@@ -222,7 +210,7 @@ func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, er
 		in.AddrKnown = true
 
 		if in.WidthKnown {
-			a.Flavor.SetAddr(addr + in.MinWidth)
+			a.Flavor.SetAddr(addr + in.Width)
 		} else {
 			a.Flavor.ClearAddr(in.Sprintf("lost known address"))
 		}
@@ -231,25 +219,23 @@ func (a *Assembler) passInst(in *inst.I, setWidth, final bool) (isFinal bool, er
 	return isFinal, nil
 }
 
-// Pass performs an assembly pass. If setWidth is true, it causes all
-// instructions to set their final width. If final is true, it returns
-// an error for any instruction that cannot be finalized.
-func (a *Assembler) Pass(setWidth, final bool) (isFinal bool, err error) {
-	// fmt.Printf("PLUGH: Pass(%v, %v): %d instructions\n", setWidth, final, len(a.Insts))
-	setWidth = setWidth || final // final ⊢ setWidth
-
+// Pass performs an assembly pass. It causes all instructions to set
+// their final width. If final is true, it returns an error for any
+// instruction that cannot be finalized.
+func (a *Assembler) Pass(final bool) (isFinal bool, err error) {
+	// fmt.Printf("PLUGH: Pass(%v): %d instructions\n", final, len(a.Insts))
 	a.initPass()
 
 	isFinal = true
 	for _, in := range a.Insts {
-		instFinal, err := a.passInst(in, setWidth, final)
+		instFinal, err := a.passInst(in, final)
 		if err != nil {
 			return false, err
 		}
 		if final && !instFinal {
 			return false, in.Errorf("cannot finalize instruction: %s", in)
 		}
-		// fmt.Printf("PLUGH: instFinal=%v, in.Final=%v, in.WidthKnown=%v, in.MinWidth=%v\n", instFinal, in.Final, in.WidthKnown, in.MinWidth)
+		// fmt.Printf("PLUGH: instFinal=%v, in.Final=%v, in.WidthKnown=%v, in.Width=%v\n", instFinal, in.Final, in.WidthKnown, in.Width)
 		isFinal = isFinal && instFinal
 	}
 
@@ -284,7 +270,7 @@ func (a *Assembler) Membuf() (*membuf.Membuf, error) {
 		if !in.AddrKnown {
 			return nil, in.Errorf("address unknown: %s", in)
 		}
-		if in.MinWidth > 0 {
+		if in.Width > 0 {
 			m.Write(int(in.Addr), in.Data)
 		}
 	}

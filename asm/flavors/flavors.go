@@ -9,7 +9,6 @@ import (
 type F interface {
 	ParseInstr(Line lines.Line) (inst.I, error)
 	DefaultOrigin() (uint16, error)
-	SetWidthsOnFirstPass() bool
 	ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error)
 	LocalMacroLabels() bool
 	context.Context

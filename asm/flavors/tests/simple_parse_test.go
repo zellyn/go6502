@@ -237,9 +237,9 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		if inst.Line.Parse == nil {
 			t.Errorf("Got empty inst.Line.Parse on input '%s'", tt.i)
 		}
-		_, err = inst.Compute(tt.a, true, true)
+		_, err = inst.Compute(tt.a, true)
 		if err != nil {
-			t.Errorf(`%d. %T.ParseInstr("%s"): %s.Compute(tt.a, true, true) => error: %s`, i, tt.a, tt.i, inst, err)
+			t.Errorf(`%d. %T.ParseInstr("%s"): %s.Compute(tt.a, true) => error: %s`, i, tt.a, tt.i, inst, err)
 			continue
 		}
 		if inst.String() != tt.p {
@@ -261,12 +261,8 @@ func TestSimpleCommonFunctions(t *testing.T) {
 				t.Errorf(`%d. %s.WidthKnown is false`, i, inst)
 				continue
 			}
-			if inst.MinWidth != inst.MaxWidth {
-				t.Errorf(`%d. %s: MinWidth(%d) != MaxWidth(%d)`, i, inst, inst.MinWidth, inst.MaxWidth)
-				continue
-			}
-			if inst.MinWidth != w {
-				t.Errorf(`%d. %s.MinWidth=%d; want %d`, i, inst, inst.MinWidth, w)
+			if inst.Width != w {
+				t.Errorf(`%d. %s.Width=%d; want %d`, i, inst, inst.Width, w)
 				continue
 			}
 		}

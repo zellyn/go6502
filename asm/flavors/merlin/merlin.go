@@ -163,11 +163,6 @@ func (m *Merlin) DefaultOrigin() (uint16, error) {
 	return 0x8000, nil
 }
 
-func (m *Merlin) SetWidthsOnFirstPass() bool {
-	// TODO(zellyn): figure this out
-	return true
-}
-
 func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
 	lp.AcceptUntil(";")
@@ -182,8 +177,7 @@ func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	in.TextArg = prefix + filename
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }

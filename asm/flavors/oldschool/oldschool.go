@@ -128,10 +128,6 @@ func (a *Base) DefaultOrigin() (uint16, error) {
 	return 0x0800, nil
 }
 
-func (a *Base) SetWidthsOnFirstPass() bool {
-	return true
-}
-
 // ParseCmd parses the "command" part of an instruction: we expect to be
 // looking at a non-whitespace character.
 func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
@@ -248,8 +244,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 		op := summary.Ops[0]
 		in.Data = []byte{op.Byte}
 		in.WidthKnown = true
-		in.MinWidth = 1
-		in.MaxWidth = 1
+		in.Width = 1
 		in.Final = true
 		in.Mode = opcodes.MODE_IMPLIED
 		return in, nil
@@ -277,8 +272,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 		}
 		in.Data = []byte{op.Byte}
 		in.WidthKnown = true
-		in.MinWidth = 1
-		in.MaxWidth = 1
+		in.Width = 1
 		in.Final = true
 		in.Mode = opcodes.MODE_A
 		return in, nil
@@ -307,8 +301,7 @@ func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 			}
 			in.Data = []byte{op.Byte}
 			in.WidthKnown = true
-			in.MinWidth = 1
-			in.MaxWidth = 1
+			in.Width = 1
 			in.Final = true
 			in.Mode = opcodes.MODE_A
 			in.Exprs = nil
@@ -358,8 +351,7 @@ func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }
@@ -434,8 +426,7 @@ func (a *Base) ParseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }
@@ -448,8 +439,7 @@ func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }
@@ -486,8 +476,7 @@ func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	in.TextArg = lp.Emit()
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }
@@ -500,8 +489,7 @@ func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 	in.TextArg = lp.Emit()
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }
@@ -510,16 +498,14 @@ func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 func (a *Base) MarkMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.TextArg, in.Label = in.Label, ""
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }
 
 func (a *Base) ParseNoArgDir(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.WidthKnown = true
-	in.MinWidth = 0
-	in.MaxWidth = 0
+	in.Width = 0
 	in.Final = true
 	return in, nil
 }

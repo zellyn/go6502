@@ -305,19 +305,13 @@ func TestMultiline(t *testing.T) {
 			t.Errorf(`%d("%s" - %T): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, tt.a.Flavor, err)
 			continue
 		}
-		if !tt.a.Flavor.SetWidthsOnFirstPass() {
-			if _, err := tt.a.Pass(true, false); err != nil {
-				t.Errorf(`%d("%s" - %T): tt.a.Pass(true, false) failed: %s`, i, tt.name, tt.a.Flavor, err)
-				continue
-			}
-		}
-		isFinal, err := tt.a.Pass(true, true)
+		isFinal, err := tt.a.Pass(true)
 		if err != nil {
-			t.Errorf(`%d("%s" - %T): tt.a.Pass(true, true) failed: %s`, i, tt.name, tt.a.Flavor, err)
+			t.Errorf(`%d("%s" - %T): tt.a.Pass(true) failed: %s`, i, tt.name, tt.a.Flavor, err)
 			continue
 		}
 		if !isFinal {
-			t.Errorf(`%d("%s" - %T): tt.a.Pass(true, true) couldn't finalize`, i, tt.name, tt.a.Flavor)
+			t.Errorf(`%d("%s" - %T): tt.a.Pass(true) couldn't finalize`, i, tt.name, tt.a.Flavor)
 			continue
 		}
 

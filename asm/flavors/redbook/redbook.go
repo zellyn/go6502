@@ -36,6 +36,7 @@ func newRedbook() *RedBook {
 	r.CommentChar = ';'
 	r.MsbChars = "/"
 	r.ImmediateChars = "#"
+	r.HexCommas = oldschool.ReqOptional
 
 	r.Directives = map[string]oldschool.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, r.ParseAddress, 0},
@@ -48,12 +49,7 @@ func newRedbook() *RedBook {
 		"DDB":    {inst.TypeData, r.ParseData, inst.DataWordsBe},
 		"ASC":    {inst.TypeData, r.ParseAscii, inst.DataAscii},
 		"DCI":    {inst.TypeData, r.ParseAscii, inst.DataAsciiFlip},
-		".DO":    {inst.TypeIfdef, r.ParseDo, 0},
-		".ELSE":  {inst.TypeIfdefElse, r.ParseNoArgDir, 0},
-		".FIN":   {inst.TypeIfdefEnd, r.ParseNoArgDir, 0},
-		".MA":    {inst.TypeMacroStart, r.ParseMacroStart, 0},
-		".EM":    {inst.TypeMacroEnd, r.ParseNoArgDir, 0},
-		".US":    {inst.TypeNone, r.ParseNotImplemented, 0},
+		"HEX":    {inst.TypeData, r.ParseHexString, inst.DataBytes},
 		"PAGE":   {inst.TypeNone, nil, 0}, // New page
 		"TITLE":  {inst.TypeNone, nil, 0}, // Title
 		"SBTL":   {inst.TypeNone, nil, 0}, // Subtitle

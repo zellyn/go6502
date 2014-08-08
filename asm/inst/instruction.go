@@ -63,8 +63,7 @@ type I struct {
 	Exprs        []*expr.E              // Expression(s)
 	Data         []byte                 // Actual bytes
 	WidthKnown   bool                   // Do we know how many bytes this instruction takes yet?
-	MinWidth     uint16                 // minimum width in bytes
-	MaxWidth     uint16                 // maximum width in bytes
+	Width        uint16                 // width in bytes
 	Final        bool                   // Do we know the actual bytes yet?
 	Op           byte                   // Opcode
 	Mode         opcodes.AddressingMode // Opcode mode
@@ -192,11 +191,11 @@ func (i I) String() string {
 }
 
 // Compute attempts to finalize the instruction.
-func (i *I) Compute(c context.Context, setWidth bool, final bool) (bool, error) {
+func (i *I) Compute(c context.Context, final bool) (bool, error) {
 	if i.Type == TypeEqu || i.Type == TypeTarget || i.Type == TypeOrg {
-		return i.computeMustKnow(c, setWidth, final)
+		return i.computeMustKnow(c, final)
 	}
-	if err := i.computeLabel(c, setWidth, final); err != nil {
+	if err := i.computeLabel(c, final); err != nil {
 		return false, err
 	}
 	if i.Final {
@@ -204,17 +203,16 @@ func (i *I) Compute(c context.Context, setWidth bool, final bool) (bool, error) 
 	}
 	switch i.Type {
 	case TypeOp:
-		return i.computeOp(c, setWidth, final)
+		return i.computeOp(c, final)
 	case TypeData:
-		return i.computeData(c, setWidth, final)
+		return i.computeData(c, final)
 	case TypeBlock:
-		return i.computeBlock(c, setWidth, final)
+		return i.computeBlock(c, final)
 	}
 
 	// Everything else is zero-width
 	i.WidthKnown = true
-	i.MinWidth = 0
-	i.MaxWidth = 0
+	i.Width = 0
 	i.Final = true
 
 	return true, nil
@@ -244,7 +242,7 @@ func (i *I) FixLabels(labeler context.Labeler) error {
 }
 
 // computeLabel attempts to compute equates and label values.
-func (i *I) computeLabel(c context.Context, setWidth bool, final bool) error {
+func (i *I) computeLabel(c context.Context, final bool) error {
 	if i.Label == "" {
 		return nil
 	}
@@ -266,11 +264,10 @@ func (i *I) computeLabel(c context.Context, setWidth bool, final bool) error {
 	return nil
 }
 
-func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, error) {
+func (i *I) computeData(c context.Context, final bool) (bool, error) {
 	if len(i.Data) > 0 {
 		i.WidthKnown = true
-		i.MinWidth = uint16(len(i.Data))
-		i.MaxWidth = i.MinWidth
+		i.Width = uint16(len(i.Data))
 		i.Final = true
 		return true, nil
 	}
@@ -317,8 +314,7 @@ func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, err
 			panic(fmt.Sprintf("Unknown data variant handed to computeData: %d", i.Var))
 		}
 	}
-	i.MinWidth = width
-	i.MaxWidth = width
+	i.Width = width
 	i.WidthKnown = true
 	if allFinal {
 		i.Data = data
@@ -328,26 +324,24 @@ func (i *I) computeData(c context.Context, setWidth bool, final bool) (bool, err
 	return i.Final, nil
 }
 
-func (i *I) computeBlock(c context.Context, setWidth bool, final bool) (bool, error) {
+func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
 	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err == nil {
 		i.Value = val
 		i.WidthKnown = true
 		i.Final = true
-		i.MinWidth = val
-		i.MaxWidth = val
+		i.Width = val
 	} else {
-		if setWidth || final {
+		if final {
 			return false, i.Errorf("block storage with unknown size")
 		}
 	}
 	return i.Final, nil
 }
 
-func (i *I) computeMustKnow(c context.Context, setWidth bool, final bool) (bool, error) {
+func (i *I) computeMustKnow(c context.Context, final bool) (bool, error) {
 	i.WidthKnown = true
-	i.MinWidth = 0
-	i.MaxWidth = 0
+	i.Width = 0
 	i.Final = true
 	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err != nil {
@@ -364,13 +358,13 @@ func (i *I) computeMustKnow(c context.Context, setWidth bool, final bool) (bool,
 		// Don't handle labels.
 		return true, nil
 	}
-	if err := i.computeLabel(c, setWidth, final); err != nil {
+	if err := i.computeLabel(c, final); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error) {
+func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 	// If the width is not known, we better have a ZeroPage alternative.
 	if !i.WidthKnown && (i.ZeroOp == 0 || i.ZeroMode == 0) {
 		if i.Line.Context != nil && i.Line.Context.Parent != nil {
@@ -402,20 +396,15 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 		// Do we know the width, even though the value is unknown?
 		if i.Exprs[0].Width() == 1 {
 			i.WidthKnown = true
-			i.MinWidth, i.MaxWidth = 2, 2
+			i.Width = 2
 			i.Op, i.Mode = i.ZeroOp, i.ZeroMode
 			i.ZeroOp, i.ZeroMode = 0, 0
 			return false, nil
 		}
 
-		// Don't know the width, but don't care on this pass.
-		if !setWidth {
-			return false, nil
-		}
-
 		// Okay, we have to set the width: since we don't know, go wide.
 		i.WidthKnown = true
-		i.MinWidth, i.MaxWidth = 3, 3
+		i.Width = 3
 		i.ZeroOp, i.ZeroMode = 0, 0
 		return false, nil
 	}
@@ -425,14 +414,11 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 	// We need to figure out the width
 	if !i.WidthKnown {
 		if val < 0x100 {
-			i.MinWidth = 2
-			i.MaxWidth = 2
+			i.Width = 2
 			i.Op = i.ZeroOp
 			i.Mode = i.ZeroMode
 		} else {
-			i.MinWidth = 3
-			i.MaxWidth = 3
-
+			i.Width = 3
 		}
 	}
 
@@ -461,7 +447,7 @@ func (i *I) computeOp(c context.Context, setWidth bool, final bool) (bool, error
 	i.ZeroOp = 0
 	i.ZeroMode = 0
 
-	switch i.MinWidth {
+	switch i.Width {
 	case 2:
 		// TODO(zellyn): Warn if > 0xff
 		i.Data = []byte{i.Op, byte(val)}

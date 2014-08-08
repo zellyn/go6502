@@ -26,8 +26,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			}
 			in.Op = op.Byte
 			in.WidthKnown = true
-			in.MinWidth = 2
-			in.MaxWidth = 2
+			in.Width = 2
 			in.Mode = opcodes.MODE_INDIRECT_X
 			return in, nil
 		case 'y':
@@ -39,8 +38,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 				return in, fmt.Errorf("%s (addr),Y doesn't have a wide variant", in.Command)
 			}
 			in.WidthKnown = true
-			in.MinWidth = 2
-			in.MaxWidth = 2
+			in.Width = 2
 			in.Mode = opcodes.MODE_INDIRECT_Y
 			in.Op = op.Byte
 			return in, nil
@@ -51,8 +49,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			}
 			in.Op = op.Byte
 			in.WidthKnown = true
-			in.MinWidth = 3
-			in.MaxWidth = 3
+			in.Width = 3
 			in.Mode = opcodes.MODE_INDIRECT
 			return in, nil
 		}
@@ -70,8 +67,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 
 		in.Op = op.Byte
 		in.WidthKnown = true
-		in.MinWidth = 2
-		in.MaxWidth = 2
+		in.Width = 2
 		in.Mode = opcodes.MODE_RELATIVE
 		return in, nil
 	}
@@ -84,8 +80,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		}
 		in.Op = op.Byte
 		in.WidthKnown = true
-		in.MinWidth = 2
-		in.MaxWidth = 2
+		in.Width = 2
 		in.Mode = opcodes.MODE_IMMEDIATE
 		return in, nil
 	}
@@ -117,8 +112,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		}
 		in.Op = opWide.Byte
 		in.WidthKnown = true
-		in.MinWidth = 3
-		in.MaxWidth = 3
+		in.Width = 3
 		in.Mode = wide
 		return in, nil
 	}
@@ -131,8 +125,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		}
 		in.Op = opZp.Byte
 		in.WidthKnown = true
-		in.MinWidth = 2
-		in.MaxWidth = 2
+		in.Width = 2
 		in.Mode = zp
 		return in, nil
 	}
@@ -140,8 +133,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 	if forceWide {
 		in.Op = opWide.Byte
 		in.WidthKnown = true
-		in.MinWidth = 3
-		in.MaxWidth = 3
+		in.Width = 3
 		in.Mode = wide
 		return in, nil
 	}
@@ -157,7 +149,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 	in.ZeroOp = opZp.Byte
 	in.Mode = wide
 	in.ZeroMode = zp
-	in.MinWidth = 2
-	in.MaxWidth = 3
+	in.Width = 2
 	return in, nil
 }
