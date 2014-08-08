@@ -293,7 +293,7 @@ func TestMultiline(t *testing.T) {
 			continue
 		}
 		if tt.b == "" && len(tt.ps) == 0 {
-			t.Fatalf(`%d("%s" - %T): test case must specify bytes or pieces`, i, tt.name, tt.a.Flavor)
+			t.Fatalf(`%d("%s" - %s): test case must specify bytes or pieces`, i, tt.name, tt.a.Flavor)
 		}
 		tt.a.Reset()
 		o.Clear()
@@ -302,40 +302,40 @@ func TestMultiline(t *testing.T) {
 			o[k] = strings.Join(v, "\n")
 		}
 		if err := tt.a.Load("TESTFILE", 0); err != nil {
-			t.Errorf(`%d("%s" - %T): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, tt.a.Flavor, err)
+			t.Errorf(`%d("%s" - %s): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, tt.a.Flavor, err)
 			continue
 		}
 		isFinal, err := tt.a.Pass(true)
 		if err != nil {
-			t.Errorf(`%d("%s" - %T): tt.a.Pass(true) failed: %s`, i, tt.name, tt.a.Flavor, err)
+			t.Errorf(`%d("%s" - %s): tt.a.Pass(true) failed: %s`, i, tt.name, tt.a.Flavor, err)
 			continue
 		}
 		if !isFinal {
-			t.Errorf(`%d("%s" - %T): tt.a.Pass(true) couldn't finalize`, i, tt.name, tt.a.Flavor)
+			t.Errorf(`%d("%s" - %s): tt.a.Pass(true) couldn't finalize`, i, tt.name, tt.a.Flavor)
 			continue
 		}
 
 		if tt.b != "" {
 			bb, err := tt.a.RawBytes()
 			if err != nil {
-				t.Errorf(`%d("%s" - %T): tt.a.RawBytes() failed: %s`, i, tt.name, tt.a.Flavor, err)
+				t.Errorf(`%d("%s" - %s): tt.a.RawBytes() failed: %s`, i, tt.name, tt.a.Flavor, err)
 				continue
 			}
 			hx := hex.EncodeToString(bb)
 			if hx != tt.b {
-				t.Errorf(`%d("%s" - %T): tt.a.RawBytes()=[%s]; want [%s]`, i, tt.name, tt.a.Flavor, hx, tt.b)
+				t.Errorf(`%d("%s" - %s): tt.a.RawBytes()=[%s]; want [%s]`, i, tt.name, tt.a.Flavor, hx, tt.b)
 				continue
 			}
 		}
 		if len(tt.ps) != 0 {
 			m, err := tt.a.Membuf()
 			if err != nil {
-				t.Errorf(`%d("%s" - %T): tt.a.Membuf() failed: %s`, i, tt.name, tt.a.Flavor, err)
+				t.Errorf(`%d("%s" - %s): tt.a.Membuf() failed: %s`, i, tt.name, tt.a.Flavor, err)
 				continue
 			}
 			ps := m.Pieces()
 			if !reflect.DeepEqual(ps, tt.ps) {
-				t.Errorf(`%d("%s" - %T): tt.Membuf().Pieces() = %v; want %v`, i, tt.name, tt.a.Flavor, ps, tt.ps)
+				t.Errorf(`%d("%s" - %s): tt.Membuf().Pieces() = %v; want %v`, i, tt.name, tt.a.Flavor, ps, tt.ps)
 				continue
 			}
 		}

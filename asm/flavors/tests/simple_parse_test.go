@@ -231,7 +231,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 
 		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i))
 		if err != nil {
-			t.Errorf(`%d. %T.ParseInstr("%s") => error: %s`, i, tt.a, tt.i, err)
+			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.a, tt.i, err)
 			continue
 		}
 		if inst.Line.Parse == nil {
@@ -239,11 +239,11 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		}
 		_, err = inst.Compute(tt.a, true)
 		if err != nil {
-			t.Errorf(`%d. %T.ParseInstr("%s"): %s.Compute(tt.a, true) => error: %s`, i, tt.a, tt.i, inst, err)
+			t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.a, true) => error: %s`, i, tt.a, tt.i, inst, err)
 			continue
 		}
 		if inst.String() != tt.p {
-			t.Errorf(`%d. %T.ParseInstr("%s") = %s; want %s`, i, tt.a, tt.i, inst.String(), tt.p)
+			t.Errorf(`%d. %s.ParseInstr("%s") = %s; want %s`, i, tt.a, tt.i, inst.String(), tt.p)
 			continue
 		}
 
@@ -251,7 +251,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 			hx := hex.EncodeToString(inst.Data)
 			// xxxxxx sets the width, but doesn't expect actual data
 			if hx != tt.b && (len(tt.b) == 0 || tt.b[0] != 'x') {
-				t.Errorf(`%d. %T.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.a, tt.i, hx, tt.b)
+				t.Errorf(`%d. %s.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.a, tt.i, hx, tt.b)
 				continue
 			}
 
@@ -295,7 +295,7 @@ func TestSimpleErrors(t *testing.T) {
 		}
 		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i))
 		if err == nil {
-			t.Errorf(`%d. %T.ParseInstr("%s") want err; got %s`, i, tt.a, tt.i, inst)
+			t.Errorf(`%d. %s.ParseInstr("%s") want err; got %s`, i, tt.a, tt.i, inst)
 			continue
 		}
 	}

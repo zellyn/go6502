@@ -23,6 +23,7 @@ const macroNameChars = oldschool.Letters + oldschool.Digits + "_"
 
 func New() *Merlin {
 	m := &Merlin{}
+	m.Name = "merlin"
 	m.LabelChars = oldschool.Letters + oldschool.Digits + ":"
 	m.LabelColons = oldschool.ReqDisallowed
 	m.ExplicitARegister = oldschool.ReqOptional

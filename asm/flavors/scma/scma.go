@@ -20,6 +20,7 @@ type SCMA struct {
 
 func New() *SCMA {
 	a := &SCMA{}
+	a.Name = "scma"
 	a.LabelChars = oldschool.Letters + oldschool.Digits + ".:"
 	a.LabelColons = oldschool.ReqDisallowed
 	a.ExplicitARegister = oldschool.ReqDisallowed

@@ -40,6 +40,7 @@ const (
 // Base implements the S-C Macro Assembler-compatible assembler flavor.
 // See http://www.txbobsc.com/scsc/ and http://stjarnhimlen.se/apple2/
 type Base struct {
+	Name       string
 	Directives map[string]DirectiveInfo
 	Operators  map[string]expr.Operator
 	context.SimpleContext
@@ -63,6 +64,10 @@ type Base struct {
 	CharChars         string
 	InvCharChars      string
 	MacroArgSep       string
+}
+
+func (a *Base) String() string {
+	return a.Name
 }
 
 // Parse an entire instruction, or return an appropriate error.

@@ -15,20 +15,20 @@ type RedBook struct {
 }
 
 func NewRedbookA() *RedBook {
-	r := newRedbook()
+	r := newRedbook("redbook-a")
 	return r
 }
 
 func NewRedbookB() *RedBook {
-	r := newRedbook()
+	r := newRedbook("redbook-b")
 	r.ExplicitARegister = oldschool.ReqRequired
 	r.SpacesForComment = 3
 	return r
 }
 
-func newRedbook() *RedBook {
+func newRedbook(name string) *RedBook {
 	r := &RedBook{}
-
+	r.Name = name
 	r.LabelChars = oldschool.Letters + oldschool.Digits + "."
 	r.LabelColons = oldschool.ReqOptional
 	r.ExplicitARegister = oldschool.ReqRequired

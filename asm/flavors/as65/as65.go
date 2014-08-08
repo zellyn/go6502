@@ -48,3 +48,7 @@ func (a *AS65) FixLabel(label string, macroCall int, locals map[string]bool) (st
 func (a *AS65) LocalMacroLabels() bool {
 	return false
 }
+
+func (a *AS65) String() string {
+	return "as65"
+}
