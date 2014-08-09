@@ -160,8 +160,8 @@ func (m *Merlin) Zero() (uint16, error) {
 	return 0, errors.New("Division by zero.")
 }
 
-func (m *Merlin) DefaultOrigin() (uint16, error) {
-	return 0x8000, nil
+func (m *Merlin) DefaultOrigin() uint16 {
+	return 0x8000
 }
 
 func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {

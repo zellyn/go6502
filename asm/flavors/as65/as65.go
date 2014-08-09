@@ -29,8 +29,8 @@ func (a *AS65) Zero() (uint16, error) {
 	return 0, errors.New("Division by zero.")
 }
 
-func (a *AS65) DefaultOrigin() (uint16, error) {
-	return 0, nil
+func (a *AS65) DefaultOrigin() uint16 {
+	return 0
 }
 
 func (a *AS65) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {

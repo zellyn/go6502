@@ -184,11 +184,7 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 func (a *Assembler) initPass() {
 	a.Flavor.SetLastLabel("") // No last label (yet)
 	a.Flavor.RemoveChanged()  // Remove any variables whose value ever changed.
-	if org, err := a.Flavor.DefaultOrigin(); err == nil {
-		a.Flavor.SetAddr(org)
-	} else {
-		a.Flavor.ClearAddr("beginning of assembly")
-	}
+	a.Flavor.SetAddr(a.Flavor.DefaultOrigin())
 }
 
 // passInst performs a pass on a single instruction. It forces the
@@ -204,17 +200,9 @@ func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
 	}
 
 	// Update address
-	if a.Flavor.AddrKnown() {
-		addr, _ := a.Flavor.GetAddr()
-		in.Addr = addr
-		in.AddrKnown = true
-
-		if in.WidthKnown {
-			a.Flavor.SetAddr(addr + in.Width)
-		} else {
-			a.Flavor.ClearAddr(in.Sprintf("lost known address"))
-		}
-	}
+	addr, _ := a.Flavor.GetAddr()
+	in.Addr = addr
+	a.Flavor.SetAddr(addr + in.Width)
 
 	return isFinal, nil
 }
@@ -267,9 +255,6 @@ func (a *Assembler) Membuf() (*membuf.Membuf, error) {
 		if !in.Final {
 			return nil, in.Errorf("cannot finalize value: %s", in)
 		}
-		if !in.AddrKnown {
-			return nil, in.Errorf("address unknown: %s", in)
-		}
 		if in.Width > 0 {
 			m.Write(int(in.Addr), in.Data)
 		}
@@ -281,9 +266,6 @@ func (a *Assembler) GenerateListing(w io.Writer, width int) error {
 	for _, in := range a.Insts {
 		if !in.Final {
 			return in.Errorf("cannot finalize value: %s", in)
-		}
-		if !in.AddrKnown {
-			return in.Errorf("address unknown: %s", in)
 		}
 
 		for i := 0; i < len(in.Data) || i < width; i++ {

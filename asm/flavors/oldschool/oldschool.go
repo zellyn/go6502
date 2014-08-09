@@ -129,8 +129,8 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 	return a.ParseCmd(in, lp)
 }
 
-func (a *Base) DefaultOrigin() (uint16, error) {
-	return 0x0800, nil
+func (a *Base) DefaultOrigin() uint16 {
+	return 0x0800
 }
 
 // ParseCmd parses the "command" part of an instruction: we expect to be

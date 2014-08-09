@@ -73,7 +73,6 @@ type I struct {
 	DeclaredLine uint16                 // Line number listed in file
 	Line         *lines.Line            // Line object for this line
 	Addr         uint16                 // Current memory address
-	AddrKnown    bool                   // Whether the current memory address is known
 	Var          int                    // Variant of instruction type
 }
 

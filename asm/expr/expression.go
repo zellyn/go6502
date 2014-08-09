@@ -118,11 +118,6 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 		if val, ok := ctx.Get(e.Text); ok {
 			return val, nil
 		}
-		if e.Text == "*" && !ctx.AddrKnown() {
-			e := ln.Errorf("address unknown due to %v", ctx.ClearMesg())
-			return 0, UnknownLabelError{Err: e}
-
-		}
 		return 0, UnknownLabelError{Err: ln.Errorf("unknown label: %s", e.Text)}
 	case OpMinus:
 		l, err := e.Left.Eval(ctx, ln)

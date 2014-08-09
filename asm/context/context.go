@@ -11,7 +11,6 @@ type Context interface {
 	GetAddr() (uint16, bool)
 	Zero() (uint16, error) // type ZeroFunc
 	RemoveChanged()
-	AddrKnown() bool
 	Clear()
 	SettingOn(name string) error
 	SettingOff(name string) error
@@ -74,10 +73,6 @@ func (sc *SimpleContext) GetAddr() (uint16, bool) {
 		return 0, false
 	}
 	return uint16(sc.addr), true
-}
-
-func (sc *SimpleContext) AddrKnown() bool {
-	return sc.addr != -1
 }
 
 func (sc *SimpleContext) Set(name string, value uint16) {
