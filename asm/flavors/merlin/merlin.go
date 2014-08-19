@@ -43,14 +43,14 @@ func New() *Merlin {
 		"ORG":    {inst.TypeOrg, m.ParseAddress, 0},
 		"OBJ":    {inst.TypeNone, nil, 0},
 		"ENDASM": {inst.TypeEnd, m.ParseNoArgDir, 0},
-		"=":      {inst.TypeEqu, m.ParseEquate, inst.EquNormal},
-		"HEX":    {inst.TypeData, m.ParseHexString, inst.DataBytes},
-		"DFB":    {inst.TypeData, m.ParseData, inst.DataBytes},
-		"DB":     {inst.TypeData, m.ParseData, inst.DataBytes},
-		"DA":     {inst.TypeData, m.ParseData, inst.DataWordsLe},
-		"DDB":    {inst.TypeData, m.ParseData, inst.DataWordsBe},
-		"ASC":    {inst.TypeData, m.ParseAscii, inst.DataAscii},
-		"DCI":    {inst.TypeData, m.ParseAscii, inst.DataAsciiFlip},
+		"=":      {inst.TypeEqu, m.ParseEquate, inst.VarEquNormal},
+		"HEX":    {inst.TypeData, m.ParseHexString, inst.VarBytes},
+		"DFB":    {inst.TypeData, m.ParseData, inst.VarBytes},
+		"DB":     {inst.TypeData, m.ParseData, inst.VarBytes},
+		"DA":     {inst.TypeData, m.ParseData, inst.VarWordsLe},
+		"DDB":    {inst.TypeData, m.ParseData, inst.VarWordsBe},
+		"ASC":    {inst.TypeData, m.ParseAscii, inst.VarAscii},
+		"DCI":    {inst.TypeData, m.ParseAscii, inst.VarAsciiFlip},
 		".DO":    {inst.TypeIfdef, m.ParseDo, 0},
 		".ELSE":  {inst.TypeIfdefElse, m.ParseNoArgDir, 0},
 		".FIN":   {inst.TypeIfdefEnd, m.ParseNoArgDir, 0},
@@ -94,13 +94,13 @@ func New() *Merlin {
 		invertLast := in.Command == "DCI"
 		switch {
 		case !invert && !invertLast:
-			in.Var = inst.DataAscii
+			in.Var = inst.VarAscii
 		case !invert && invertLast:
-			in.Var = inst.DataAsciiFlip
+			in.Var = inst.VarAsciiFlip
 		case invert && !invertLast:
-			in.Var = inst.DataAsciiHi
+			in.Var = inst.VarAsciiHi
 		case invert && invertLast:
-			in.Var = inst.DataAsciiHiFlip
+			in.Var = inst.VarAsciiHiFlip
 		}
 	}
 
@@ -153,6 +153,28 @@ func New() *Merlin {
 		return in, true, nil
 	}
 
+	m.FixLabel = func(label string) (string, error) {
+		_, macroCount, locals := m.GetMacroCall()
+		switch {
+		case label == "":
+			return label, nil
+		case label[0] == ':':
+			if last := m.LastLabel(); last == "" {
+				return "", fmt.Errorf("sublabel '%s' without previous label", label)
+			} else {
+				return fmt.Sprintf("%s/%s", last, label), nil
+			}
+		case locals[label]:
+			return fmt.Sprintf("%s{%d}", label, macroCount), nil
+
+		}
+		return label, nil
+	}
+
+	m.IsNewParentLabel = func(label string) bool {
+		return label != "" && label[0] != ':'
+	}
+
 	return m
 }
 
@@ -181,27 +203,6 @@ func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Width = 0
 	in.Final = true
 	return in, nil
-}
-
-func (m *Merlin) IsNewParentLabel(label string) bool {
-	return label != "" && label[0] != ':'
-}
-
-func (m *Merlin) FixLabel(label string, macroCount int, locals map[string]bool) (string, error) {
-	switch {
-	case label == "":
-		return label, nil
-	case label[0] == ':':
-		if last := m.LastLabel(); last == "" {
-			return "", fmt.Errorf("sublabel '%s' without previous label", label)
-		} else {
-			return fmt.Sprintf("%s/%s", last, label), nil
-		}
-	case locals[label]:
-		return fmt.Sprintf("%s{%d}", label, macroCount), nil
-
-	}
-	return label, nil
 }
 
 func (m *Merlin) LocalMacroLabels() bool {

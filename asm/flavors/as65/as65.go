@@ -13,7 +13,6 @@ import (
 
 type AS65 struct {
 	context.SimpleContext
-	context.LabelerBase
 }
 
 func New() *AS65 {
@@ -21,7 +20,7 @@ func New() *AS65 {
 }
 
 // Parse an entire instruction, or return an appropriate error.
-func (a *AS65) ParseInstr(line lines.Line) (inst.I, error) {
+func (a *AS65) ParseInstr(line lines.Line, quick bool) (inst.I, error) {
 	return inst.I{}, nil
 }
 
@@ -39,10 +38,6 @@ func (a *AS65) ReplaceMacroArgs(line string, args []string, kwargs map[string]st
 
 func (a *AS65) IsNewParentLabel(label string) bool {
 	return label != "" && label[0] != '.'
-}
-
-func (a *AS65) FixLabel(label string, macroCall int, locals map[string]bool) (string, error) {
-	panic("AS65.FixLabel not implemented yet.")
 }
 
 func (a *AS65) LocalMacroLabels() bool {

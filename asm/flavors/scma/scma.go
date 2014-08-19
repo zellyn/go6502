@@ -37,10 +37,10 @@ func New() *SCMA {
 		".TF":   {inst.TypeNone, nil, 0},
 		".EN":   {inst.TypeEnd, a.ParseNoArgDir, 0},
 		".EQ":   {inst.TypeEqu, a.ParseEquate, 0},
-		".DA":   {inst.TypeData, a.ParseData, inst.DataMixed},
-		".HS":   {inst.TypeData, a.ParseHexString, inst.DataBytes},
-		".AS":   {inst.TypeData, a.ParseAscii, inst.DataBytes},
-		".AT":   {inst.TypeData, a.ParseAscii, inst.DataBytes},
+		".DA":   {inst.TypeData, a.ParseData, inst.VarMixed},
+		".HS":   {inst.TypeData, a.ParseHexString, inst.VarBytes},
+		".AS":   {inst.TypeData, a.ParseAscii, inst.VarBytes},
+		".AT":   {inst.TypeData, a.ParseAscii, inst.VarBytes},
 		".BS":   {inst.TypeBlock, a.ParseBlockStorage, 0},
 		".TI":   {inst.TypeNone, nil, 0},
 		".LIST": {inst.TypeNone, nil, 0},
@@ -73,13 +73,13 @@ func New() *SCMA {
 		invertLast := in.Command == ".AT"
 		switch {
 		case !invert && !invertLast:
-			in.Var = inst.DataAscii
+			in.Var = inst.VarAscii
 		case !invert && invertLast:
-			in.Var = inst.DataAsciiFlip
+			in.Var = inst.VarAsciiFlip
 		case invert && !invertLast:
-			in.Var = inst.DataAsciiHi
+			in.Var = inst.VarAsciiHi
 		case invert && invertLast:
-			in.Var = inst.DataAsciiHiFlip
+			in.Var = inst.VarAsciiHiFlip
 		}
 	}
 
@@ -111,6 +111,9 @@ func New() *SCMA {
 
 		return in, true, nil
 	}
+
+	a.FixLabel = a.DefaultFixLabel
+	a.IsNewParentLabel = a.DefaultIsNewParentLabel
 
 	return a
 }

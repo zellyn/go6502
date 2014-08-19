@@ -13,7 +13,7 @@ func TestComputeLabel(t *testing.T) {
 		Label: "L1",
 	}
 	c := &context.SimpleContext{}
-	i.computeLabel(c, false, false)
+	i.computeLabel(c, false)
 }
 
 func TestWidthDoesNotChange(t *testing.T) {
@@ -27,8 +27,7 @@ func TestWidthDoesNotChange(t *testing.T) {
 				Right: &expr.E{Op: expr.OpLeaf, Text: "L2"},
 			},
 		},
-		MinWidth: 0x2,
-		MaxWidth: 0x3,
+		Width:    0x2,
 		Final:    false,
 		Op:       0xad,
 		Mode:     0x2,
@@ -38,15 +37,7 @@ func TestWidthDoesNotChange(t *testing.T) {
 	}
 	c := &context.SimpleContext{}
 	c.Set("L1", 0x102)
-	final, err := i.Compute(c, false, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if final {
-		t.Fatal("First pass shouldn't be able to finalize expression with unknown width")
-	}
-
-	final, err = i.Compute(c, true, false)
+	final, err := i.Compute(c, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,16 +47,13 @@ func TestWidthDoesNotChange(t *testing.T) {
 	if !i.WidthKnown {
 		t.Fatal("Second pass should have set width.")
 	}
-	if i.MinWidth != i.MaxWidth {
-		t.Fatalf("i.WidthKnown, but i.MinWidth(%d) != i.MaxWidth(%d)", i.MinWidth, i.MaxWidth)
-	}
-	if i.MinWidth != 3 {
-		t.Fatalf("i.MinWidth should be 3; got %d", i.MinWidth)
+	if i.Width != 3 {
+		t.Fatalf("i.Width should be 3; got %d", i.Width)
 	}
 
 	c.Set("L2", 0x101)
 
-	final, err = i.Compute(c, true, true)
+	final, err = i.Compute(c, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,10 +63,7 @@ func TestWidthDoesNotChange(t *testing.T) {
 	if !i.WidthKnown {
 		t.Fatal("Third pass should left width unchanged.")
 	}
-	if i.MinWidth != i.MaxWidth {
-		t.Fatalf("i.WidthKnown, but i.MinWidth(%d) != i.MaxWidth(%d)", i.MinWidth, i.MaxWidth)
-	}
-	if i.MinWidth != 3 {
-		t.Fatalf("i.MinWidth should still be 3; got %d", i.MinWidth)
+	if i.Width != 3 {
+		t.Fatalf("i.Width should still be 3; got %d", i.Width)
 	}
 }

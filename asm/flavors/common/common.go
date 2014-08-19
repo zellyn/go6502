@@ -8,10 +8,14 @@ import (
 	"github.com/zellyn/go6502/opcodes"
 )
 
+const xyzzy = false
+
 // DecodeOp contains the common code that decodes an Opcode, once we
 // have fully parsed it.
 func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect bool, xy rune, forceWide bool) (inst.I, error) {
 	ex := in.Exprs[0]
+	val, err := ex.Eval(c, in.Line)
+	valKnown := err == nil
 
 	// At this point we've parsed the Opcode. Let's see if it makes sense.
 	if indirect {
@@ -69,6 +73,17 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_RELATIVE
+		in.Mode = inst.VarRelative
+		if valKnown && xyzzy {
+			b, err := RelativeAddr(c, in, val)
+			if err != nil {
+				return in, err
+			}
+			fmt.Printf("b=$%02x\n", b)
+			in.Data = []byte{in.Op, b}
+			in.Final = true
+		}
+
 		return in, nil
 	}
 
@@ -82,6 +97,8 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_IMMEDIATE
+		in.Var = inst.VarBytes
+		//xyzzy()
 		return in, nil
 	}
 
@@ -151,4 +168,21 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 	in.ZeroMode = zp
 	in.Width = 2
 	return in, nil
+}
+
+func RelativeAddr(c context.Context, in inst.I, val uint16) (byte, error) {
+	curr, ok := c.GetAddr()
+	if !ok {
+		return 0, in.Errorf("cannot determine current address for '%s'", in.Command)
+	}
+	fmt.Printf("RelativeAddr: curr=%04x, val=%04x\n", curr, val)
+	// Found both current and target addresses
+	offset := int32(val) - (int32(curr) + 2)
+	if offset > 127 {
+		return 0, in.Errorf("%s cannot jump forward %d (max 127) from $%04x to $%04x", in.Command, offset, curr+2, val)
+	}
+	if offset < -128 {
+		return 0, in.Errorf("%s cannot jump back %d (max -128) from $%04x to $%04x", in.Command, offset, curr+2, val)
+	}
+	return byte(offset), nil
 }

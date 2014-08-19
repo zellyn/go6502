@@ -229,7 +229,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		tt.a.AddMacroName("INCW")
 		tt.a.AddMacroName("M1")
 
-		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i))
+		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i), false)
 		if err != nil {
 			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.a, tt.i, err)
 			continue
@@ -293,7 +293,7 @@ func TestSimpleErrors(t *testing.T) {
 		if tt.a != ss {
 			continue
 		}
-		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i))
+		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i), false)
 		if err == nil {
 			t.Errorf(`%d. %s.ParseInstr("%s") want err; got %s`, i, tt.a, tt.i, inst)
 			continue

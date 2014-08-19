@@ -36,22 +36,20 @@ const (
 	TypeSetting    // An on/off setting toggle
 )
 
-// Variants for "TypeData" instructions.
+// Variants for instructions. These tell the instruction how to
+// interpret the raw data that comes in on the first or second pass.
 const (
-	DataBytes       = iota // Data: expressions, but forced to one byte per
-	DataMixed              // Bytes or words (LE), depending on individual expression widths
-	DataWordsLe            // Data: expressions, but forced to one word per, little-endian
-	DataWordsBe            // Data: expressions, but forced to one word per, big-endian
-	DataAscii              // Data: from ASCII strings, high bit clear
-	DataAsciiFlip          // Data: from ASCII strings, high bit clear, except last char
-	DataAsciiHi            // Data: from ASCII strings, high bit set
-	DataAsciiHiFlip        // Data: from ASCII strings, high bit set, except last char
-)
-
-// Variants for "TypeEqu" instructions.
-const (
-	EquNormal = iota
-	EquPageZero
+	VarBytes       = iota // Data: expressions, but forced to one byte per
+	VarMixed              // Bytes or words (LE), depending on individual expression widths
+	VarWordsLe            // Data: expressions, but forced to one word per, little-endian
+	VarWordsBe            // Data: expressions, but forced to one word per, big-endian
+	VarAscii              // Data: from ASCII strings, high bit clear
+	VarAsciiFlip          // Data: from ASCII strings, high bit clear, except last char
+	VarAsciiHi            // Data: from ASCII strings, high bit set
+	VarAsciiHiFlip        // Data: from ASCII strings, high bit set, except last char
+	VarRelative           // For branches: a one-byte relative address
+	VarEquNormal          // Equ: a normal equate
+	VarEquPageZero        // Equ: a page-zero equate
 )
 
 type I struct {
@@ -98,15 +96,15 @@ func (i I) TypeString() string {
 		return "inc"
 	case TypeData:
 		switch i.Var {
-		case DataMixed:
+		case VarMixed:
 			return "data"
-		case DataBytes:
+		case VarBytes:
 			return "data/b"
-		case DataWordsLe:
+		case VarWordsLe:
 			return "data/wle"
-		case DataWordsBe:
+		case VarWordsBe:
 			return "data/wbe"
-		case DataAscii, DataAsciiHi, DataAsciiFlip, DataAsciiHiFlip:
+		case VarAscii, VarAsciiHi, VarAsciiFlip, VarAsciiHiFlip:
 			return "data/b"
 		default:
 			panic(fmt.Sprintf("unknown data variant: %d", i.Var))
@@ -217,29 +215,6 @@ func (i *I) Compute(c context.Context, final bool) (bool, error) {
 	return true, nil
 }
 
-// FixLabels attempts to turn .1 into LAST_LABEL.1, etc.
-func (i *I) FixLabels(labeler context.Labeler) error {
-	macroCall := i.Line.GetMacroCall()
-	macroLocals := i.Line.GetMacroLocals()
-	parent := labeler.IsNewParentLabel(i.Label)
-	newL, err := labeler.FixLabel(i.Label, macroCall, macroLocals)
-	if err != nil {
-		return i.Errorf("%v", err)
-	}
-	i.Label = newL
-	if parent {
-		labeler.SetLastLabel(i.Label)
-	}
-
-	for _, e := range i.Exprs {
-		if err := e.FixLabels(labeler, macroCall, macroLocals, i.Line); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // computeLabel attempts to compute equates and label values.
 func (i *I) computeLabel(c context.Context, final bool) error {
 	if i.Label == "" {
@@ -277,11 +252,11 @@ func (i *I) computeData(c context.Context, final bool) (bool, error) {
 	for _, e := range i.Exprs {
 		var w uint16
 		switch i.Var {
-		case DataMixed:
+		case VarMixed:
 			w = e.Width()
-		case DataBytes:
+		case VarBytes:
 			w = 1
-		case DataWordsLe, DataWordsBe:
+		case VarWordsLe, VarWordsBe:
 			w = 2
 		}
 		width += w
@@ -296,18 +271,18 @@ func (i *I) computeData(c context.Context, final bool) (bool, error) {
 			}
 		}
 		switch i.Var {
-		case DataMixed:
+		case VarMixed:
 			switch w {
 			case 1:
 				data = append(data, byte(val))
 			case 2:
 				data = append(data, byte(val), byte(val>>8))
 			}
-		case DataBytes:
+		case VarBytes:
 			data = append(data, byte(val))
-		case DataWordsLe:
+		case VarWordsLe:
 			data = append(data, byte(val), byte(val>>8))
-		case DataWordsBe:
+		case VarWordsBe:
 			data = append(data, byte(val>>8), byte(val))
 		default:
 			panic(fmt.Sprintf("Unknown data variant handed to computeData: %d", i.Var))

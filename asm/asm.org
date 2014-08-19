@@ -83,3 +83,45 @@ SOURCE   FILE #01 =>FOO.TXT
 * Sweet 16
 http://amigan.1emu.net/kolsen/programming/sweet16.html
 http://twimgs.com/informationweek/byte/archive/Apple-II-Description/The-Apple-II-by-Stephen-Wozniak.pdf
+
+| R0  | Accumulator                                     |
+| R12 | Subroutine stack pointer                        |
+| R13 | Comparison results                              |
+| R14 | Status (prior result register << 8 + carry bit) |
+| R15 | PC                                              |
+
+| 00 | Return to 6502 mode    | RTN      | 1 |                                         |
+| 01 | Branch always          | BR       | 2 |                                         |
+| 02 | Branch if no carry     | BNC      | 2 |                                         |
+| 03 | Branch if carry        | BC       | 2 |                                         |
+| 04 | Branch if plus         | BP       | 2 |                                         |
+| 05 | Branch if minus        | BM       | 2 |                                         |
+| 06 | Branch if zero         | BZ       | 2 |                                         |
+| 07 | Branch if nonzero      | BNZ      | 2 |                                         |
+| 08 | Branch if minus 1      | BM1      | 2 |                                         |
+| 09 | Branch if not minus 1  | BNM1     | 2 |                                         |
+| 0A | Break                  | BK       | 1 | BRK                                     |
+| 0B | Return from subroutine | RS       | 1 | PC <- [----R12]                         |
+| 0C | Branch to subroutine   | BS       | 2 | [R12++++] <- PC(R15); PC(R15) += offset |
+| 0D | -                      |          |   |                                         |
+| 0E | -                      |          |   |                                         |
+| 0F | -                      |          |   |                                         |
+| 1n | Set                    | SET R7   | 3 | Rn <- constant                          |
+| 2n | Load                   | LD R7    | 1 | R0 <- Rn                                |
+| 3n | Store                  | ST R7    | 1 | Rn <- R0                                |
+| 4n | Load indirect          | LD @R7   | 1 | R0 <- byte[Rn++]                        |
+| 5n | Store indirect         | ST @R7   | 1 | byte[Rn++] <- R0                        |
+| 6n | Load double indirect   | LDD @R7  | 1 | R0 <- word[Rn++++]                      |
+| 7n | Store double indirect  | STD @R3  | 1 | word[Rn++++] <- R0                      |
+| 8n | Pop indirect           | POP @R3  | 1 | R0 <- byte[--Rn]                        |
+| 9n | Store pop indirect     | STP @R3  | 1 | byte[--Rn] <- R0                        |
+| An | Add                    | ADD R3   | 1 | R0 <- R0 + Rn                           |
+| Bn | Sub                    | SUB R3   | 1 | R0 <- R0 - Rn                           |
+| Cn | Pop double indirect    | POPD @R3 | 1 | R0 <- word[----Rn]                      |
+| Dn | Compare                | CPR R3   | 1 | R13 <- A0 - Rn                          |
+| En | Increment              | INR R3   | 1 | Rn++                                    |
+| Fn | Decrement              | DCR R3   | 1 | Rn--                                    |
+
+* Horrible error messages
+** redbooka
+       CPY   $#0 COMMENT TEXT

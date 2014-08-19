@@ -174,7 +174,7 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 			return 0, nil
 		case OpDiv:
 			if r == 0 {
-				return ctx.Zero()
+				return ctx.DivZero()
 			}
 			return l / r, nil
 		case OpAnd:
@@ -199,24 +199,4 @@ func (e *E) CheckedEval(ctx context.Context, ln *lines.Line) (val uint16, labelM
 		return val, true, err
 	}
 	return val, false, err
-}
-
-// FixLabels attempts to turn .1 into LAST_LABEL.1, etc.
-func (e *E) FixLabels(labeler context.Labeler, macroCall int, locals map[string]bool, ln *lines.Line) error {
-	newL, err := labeler.FixLabel(e.Text, macroCall, locals)
-	if err != nil {
-		return ln.Errorf("%v", err)
-	}
-	e.Text = newL
-
-	if e.Left != nil {
-		if err := e.Left.FixLabels(labeler, macroCall, locals, ln); err != nil {
-			return err
-		}
-	}
-	if e.Right != nil {
-		return e.Right.FixLabels(labeler, macroCall, locals, ln)
-	}
-
-	return nil
 }

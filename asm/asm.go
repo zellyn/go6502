@@ -13,11 +13,10 @@ import (
 )
 
 type Assembler struct {
-	Flavor    flavors.F
-	Opener    lines.Opener
-	Insts     []*inst.I
-	LastLabel string
-	Macros    map[string]macros.M
+	Flavor flavors.F
+	Opener lines.Opener
+	Insts  []*inst.I
+	Macros map[string]macros.M
 }
 
 func NewAssembler(flavor flavors.F, opener lines.Opener) *Assembler {
@@ -44,14 +43,11 @@ func (a *Assembler) Load(filename string, prefix int) error {
 		if err != nil {
 			return err
 		}
-		// if line.Parse != nil {
-		// 	fmt.Fprintf("PLUGH: %s\n", line.Text())
-		// }
 		if done {
 			lineSources = lineSources[1:]
 			continue
 		}
-		in, parseErr := a.Flavor.ParseInstr(line)
+		in, parseErr := a.Flavor.ParseInstr(line, false)
 		if len(ifdefs) > 0 && !ifdefs[0] && in.Type != inst.TypeIfdefElse && in.Type != inst.TypeIfdefEnd {
 			// we're in an inactive ifdef branch
 			continue
@@ -61,9 +57,9 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return err
 		}
 
-		if err := in.FixLabels(a.Flavor); err != nil {
-			return err
-		}
+		// if err := in.FixLabels(a.Flavor); err != nil {
+		// 	return err
+		// }
 
 		if _, err := a.passInst(&in, false); err != nil {
 			return err
@@ -76,7 +72,6 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			}
 			return line.Errorf("unknown instruction: %s", line.Parse.Text())
 		case inst.TypeMacroStart:
-
 			if err := a.readMacro(in, lineSources[0]); err != nil {
 				return err
 			}
@@ -92,6 +87,12 @@ func (a *Assembler) Load(filename string, prefix int) error {
 				return in.Errorf(`error calling macro "%s": %v`, m.Name, err)
 			}
 			lineSources = append([]lines.LineSource{subLs}, lineSources...)
+			a.Flavor.PushMacroCall(m.Name, macroCall, m.Locals)
+		case inst.TypeMacroEnd:
+			// If we reached here, it's in a macro call, not a definition.
+			if !a.Flavor.PopMacroCall() {
+				return in.Errorf("unexpected end of macro")
+			}
 		case inst.TypeIfdef:
 			if len(in.Exprs) == 0 {
 				panic(fmt.Sprintf("Ifdef got parsed with no expression: %s", line))
@@ -166,17 +167,16 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 		if done {
 			return in.Errorf("end of file while reading macro %s", m.Name)
 		}
-		in2, err := a.Flavor.ParseInstr(line)
+		in2, err := a.Flavor.ParseInstr(line, true)
 		if a.Flavor.LocalMacroLabels() && in2.Label != "" {
 			m.Locals[in2.Label] = true
 		}
+		m.Lines = append(m.Lines, line.Parse.Text())
 		if err == nil && in2.Type == inst.TypeMacroEnd {
-			m.Lines = append(m.Lines, line.Parse.Text())
 			a.Macros[m.Name] = m
 			a.Flavor.AddMacroName(m.Name)
 			return nil
 		}
-		m.Lines = append(m.Lines, line.Parse.Text())
 	}
 }
 
@@ -246,7 +246,6 @@ func (a *Assembler) RawBytes() ([]byte, error) {
 
 func (a *Assembler) Reset() {
 	a.Insts = nil
-	a.LastLabel = ""
 }
 
 func (a *Assembler) Membuf() (*membuf.Membuf, error) {

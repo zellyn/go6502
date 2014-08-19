@@ -7,11 +7,10 @@ import (
 )
 
 type F interface {
-	ParseInstr(Line lines.Line) (inst.I, error)
+	ParseInstr(Line lines.Line, quick bool) (inst.I, error)
 	DefaultOrigin() uint16
 	ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error)
 	LocalMacroLabels() bool
 	String() string
 	context.Context
-	context.Labeler
 }

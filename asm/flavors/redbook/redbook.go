@@ -42,14 +42,14 @@ func newRedbook(name string) *RedBook {
 		"ORG":    {inst.TypeOrg, r.ParseAddress, 0},
 		"OBJ":    {inst.TypeNone, nil, 0},
 		"ENDASM": {inst.TypeEnd, r.ParseNoArgDir, 0},
-		"EQU":    {inst.TypeEqu, r.ParseEquate, inst.EquNormal},
-		"EPZ":    {inst.TypeEqu, r.ParseEquate, inst.EquPageZero},
-		"DFB":    {inst.TypeData, r.ParseData, inst.DataBytes},
-		"DW":     {inst.TypeData, r.ParseData, inst.DataWordsLe},
-		"DDB":    {inst.TypeData, r.ParseData, inst.DataWordsBe},
-		"ASC":    {inst.TypeData, r.ParseAscii, inst.DataAscii},
-		"DCI":    {inst.TypeData, r.ParseAscii, inst.DataAsciiFlip},
-		"HEX":    {inst.TypeData, r.ParseHexString, inst.DataBytes},
+		"EQU":    {inst.TypeEqu, r.ParseEquate, inst.VarEquNormal},
+		"EPZ":    {inst.TypeEqu, r.ParseEquate, inst.VarEquPageZero},
+		"DFB":    {inst.TypeData, r.ParseData, inst.VarBytes},
+		"DW":     {inst.TypeData, r.ParseData, inst.VarWordsLe},
+		"DDB":    {inst.TypeData, r.ParseData, inst.VarWordsBe},
+		"ASC":    {inst.TypeData, r.ParseAscii, inst.VarAscii},
+		"DCI":    {inst.TypeData, r.ParseAscii, inst.VarAsciiFlip},
+		"HEX":    {inst.TypeData, r.ParseHexString, inst.VarBytes},
 		"PAGE":   {inst.TypeNone, nil, 0}, // New page
 		"TITLE":  {inst.TypeNone, nil, 0}, // Title
 		"SBTL":   {inst.TypeNone, nil, 0}, // Subtitle
@@ -75,18 +75,21 @@ func newRedbook(name string) *RedBook {
 	r.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
 		if in.Command == "ASC" {
 			if r.Setting("MSB") {
-				in.Var = inst.DataAsciiHi
+				in.Var = inst.VarAsciiHi
 			} else {
-				in.Var = inst.DataAscii
+				in.Var = inst.VarAscii
 			}
 			return
 		}
 		if in.Command == "DCI" {
-			in.Var = inst.DataAsciiFlip
+			in.Var = inst.VarAsciiFlip
 		} else {
 			panic(fmt.Sprintf("Unknown ascii directive: '%s'", in.Command))
 		}
 	}
+
+	r.FixLabel = r.DefaultFixLabel
+	r.IsNewParentLabel = r.DefaultIsNewParentLabel
 
 	return r
 }

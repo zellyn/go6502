@@ -6,10 +6,8 @@ type Context interface {
 	Set(name string, value uint16)
 	Get(name string) (uint16, bool)
 	SetAddr(uint16)
-	ClearAddr(message string)
-	ClearMesg() string
 	GetAddr() (uint16, bool)
-	Zero() (uint16, error) // type ZeroFunc
+	DivZero() (uint16, error)
 	RemoveChanged()
 	Clear()
 	SettingOn(name string) error
@@ -18,17 +16,29 @@ type Context interface {
 	HasSetting(name string) bool
 	AddMacroName(name string)
 	HasMacroName(name string) bool
+	PushMacroCall(name string, number int, locals map[string]bool)
+	PopMacroCall() bool
+	GetMacroCall() (string, int, map[string]bool)
+
+	LastLabel() string
+	SetLastLabel(label string)
+}
+
+type macroCall struct {
+	name   string
+	number int
+	locals map[string]bool
 }
 
 type SimpleContext struct {
 	symbols       map[string]symbolValue
 	addr          int32
 	lastLabel     string
-	clearMesg     string // Saved message describing why Addr was cleared.
-	highbit       byte   // OR-mask for ASCII high bit
+	highbit       byte // OR-mask for ASCII high bit
 	onOff         map[string]bool
 	onOffDefaults map[string]bool
 	macroNames    map[string]bool
+	macroCalls    []macroCall
 }
 
 type symbolValue struct {
@@ -42,8 +52,8 @@ func (sc *SimpleContext) fix() {
 	}
 }
 
-func (sc *SimpleContext) Zero() (uint16, error) {
-	return 0, fmt.Errorf("Not implemented: context.SimpleContext.Zero()")
+func (sc *SimpleContext) DivZero() (uint16, error) {
+	return 0, fmt.Errorf("Not implemented: context.SimpleContext.DivZero()")
 }
 
 func (sc *SimpleContext) Get(name string) (uint16, bool) {
@@ -55,17 +65,8 @@ func (sc *SimpleContext) Get(name string) (uint16, bool) {
 	return s.v, found
 }
 
-func (sc *SimpleContext) ClearAddr(message string) {
-	sc.addr = -1
-	sc.clearMesg = message
-}
-
 func (sc *SimpleContext) SetAddr(addr uint16) {
 	sc.addr = int32(addr)
-}
-
-func (sc *SimpleContext) ClearMesg() string {
-	return sc.clearMesg
 }
 
 func (sc *SimpleContext) GetAddr() (uint16, bool) {
@@ -155,4 +156,32 @@ func (sc *SimpleContext) resetOnOff() {
 func (sc *SimpleContext) SetOnOffDefaults(defaults map[string]bool) {
 	sc.onOffDefaults = defaults
 	sc.resetOnOff()
+}
+
+func (sc *SimpleContext) PushMacroCall(name string, number int, locals map[string]bool) {
+	sc.macroCalls = append(sc.macroCalls, macroCall{name, number, locals})
+}
+
+func (sc *SimpleContext) PopMacroCall() bool {
+	if len(sc.macroCalls) == 0 {
+		return false
+	}
+	sc.macroCalls = sc.macroCalls[0 : len(sc.macroCalls)-1]
+	return true
+}
+
+func (sc *SimpleContext) GetMacroCall() (string, int, map[string]bool) {
+	if len(sc.macroCalls) == 0 {
+		return "", 0, nil
+	}
+	mc := sc.macroCalls[len(sc.macroCalls)-1]
+	return mc.name, mc.number, mc.locals
+}
+
+func (sc *SimpleContext) LastLabel() string {
+	return sc.lastLabel
+}
+
+func (sc *SimpleContext) SetLastLabel(l string) {
+	sc.lastLabel = l
 }

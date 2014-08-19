@@ -44,7 +44,6 @@ type Base struct {
 	Directives map[string]DirectiveInfo
 	Operators  map[string]expr.Operator
 	context.SimpleContext
-	context.LabelerBase
 	LabelChars        string
 	LabelColons       Requiredness
 	ExplicitARegister Requiredness
@@ -57,13 +56,16 @@ type Base struct {
 	MsbChars          string
 	LsbChars          string
 	ImmediateChars    string
-	ExtraCommenty     func(string) bool
-	SetAsciiVariation func(*inst.I, *lines.Parse)
-	ParseMacroCall    func(inst.I, *lines.Parse) (inst.I, bool, error)
 	operatorChars     string
 	CharChars         string
 	InvCharChars      string
 	MacroArgSep       string
+	LocalMacroLabels  bool
+	ExtraCommenty     func(string) bool
+	SetAsciiVariation func(*inst.I, *lines.Parse)
+	ParseMacroCall    func(inst.I, *lines.Parse) (inst.I, bool, error)
+	FixLabel          func(label string) (string, error)
+	IsNewParentLabel  func(label string) bool
 }
 
 func (a *Base) String() string {
@@ -71,7 +73,7 @@ func (a *Base) String() string {
 }
 
 // Parse an entire instruction, or return an appropriate error.
-func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
+func (a *Base) ParseInstr(line lines.Line, quick bool) (inst.I, error) {
 	lp := line.Parse
 	in := inst.I{Line: &line}
 
@@ -119,6 +121,20 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 		}
 	}
 
+	// Handle the label: munge for macros, relative labels, etc.
+	// If appropriate, set the last parent label.
+	if !quick {
+		parent := a.IsNewParentLabel(in.Label)
+		newL, err := a.FixLabel(in.Label)
+		if err != nil {
+			return in, in.Errorf("%v", err)
+		}
+		in.Label = newL
+		if parent {
+			a.SetLastLabel(in.Label)
+		}
+	}
+
 	// Ignore whitespace at the start or after the label.
 	lp.IgnoreRun(Whitespace)
 
@@ -126,22 +142,32 @@ func (a *Base) ParseInstr(line lines.Line) (inst.I, error) {
 		in.Type = inst.TypeNone
 		return in, nil
 	}
-	return a.ParseCmd(in, lp)
+	return a.parseCmd(in, lp, quick)
 }
 
 func (a *Base) DefaultOrigin() uint16 {
 	return 0x0800
 }
 
-// ParseCmd parses the "command" part of an instruction: we expect to be
+// parseCmd parses the "command" part of an instruction: we expect to be
 // looking at a non-whitespace character.
-func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) parseCmd(in inst.I, lp *lines.Parse, quick bool) (inst.I, error) {
 	if !lp.AcceptRun(cmdChars) && !(a.Directives["="].Func != nil && lp.Accept("=")) {
 		c := lp.Next()
 		return in, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
 	}
 	in.Command = lp.Emit()
 
+	if quick {
+		// all we care about is labels (already covered) and end-of-macro.
+		if dir, ok := a.Directives[in.Command]; ok {
+			if dir.Type == inst.TypeMacroEnd {
+				in.Type = inst.TypeMacroEnd
+			}
+			return in, nil
+		}
+
+	}
 	// Give ParseMacroCall a chance
 	if a.ParseMacroCall != nil {
 		i, isMacro, err := a.ParseMacroCall(in, lp)
@@ -163,12 +189,12 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 	}
 
 	if a.HasSetting(in.Command) {
-		return a.ParseSetting(in, lp)
+		return a.parseSetting(in, lp)
 	}
 
 	if summary, ok := opcodes.ByName[in.Command]; ok {
 		in.Type = inst.TypeOp
-		return a.ParseOpArgs(in, lp, summary, false)
+		return a.parseOpArgs(in, lp, summary, false)
 	}
 
 	// Merlin lets you say "LDA:" or "LDA@" or "LDAZ" to force non-zero-page.
@@ -177,14 +203,14 @@ func (a *Base) ParseCmd(in inst.I, lp *lines.Parse) (inst.I, error) {
 		if summary, ok := opcodes.ByName[prefix]; ok {
 			in.Command = prefix
 			in.Type = inst.TypeOp
-			return a.ParseOpArgs(in, lp, summary, true)
+			return a.parseOpArgs(in, lp, summary, true)
 		}
 	}
 
 	return in, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
 }
 
-func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) parseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Type = inst.TypeSetting
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(Letters) {
@@ -208,17 +234,17 @@ func (a *Base) ParseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 // character of a macro argument.
 func (a *Base) ParseMacroArg(in inst.I, lp *lines.Parse) (string, error) {
 	if lp.Peek() == '"' {
-		return a.ParseQuoted(in, lp)
+		return a.parseQuoted(in, lp)
 	}
 	lp.AcceptUntil(Whitespace + a.MacroArgSep)
 	return lp.Emit(), nil
 }
 
-// ParseQuoted parses a single quoted string macro argument. We expect
+// parseQuoted parses a single quoted string macro argument. We expect
 // to be looking at the first quote.
-func (a *Base) ParseQuoted(in inst.I, lp *lines.Parse) (string, error) {
+func (a *Base) parseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 	if !lp.Consume(`"`) {
-		panic(fmt.Sprintf("ParseQuoted called not looking at a quote"))
+		panic(fmt.Sprintf("parseQuoted called not looking at a quote"))
 	}
 	for {
 		lp.AcceptUntil(`"`)
@@ -241,9 +267,9 @@ func (a *Base) ParseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 	return strings.Replace(s, `""`, `"`, -1), nil
 }
 
-// ParseOpArgs parses the arguments to an assembly op. We expect to be
+// parseOpArgs parses the arguments to an assembly op. We expect to be
 // looking at the first non-op character (probably whitespace)
-func (a *Base) ParseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
+func (a *Base) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
 	// MODE_IMPLIED: we don't really care what comes next: it's a comment.
 	if summary.Modes == opcodes.MODE_IMPLIED {
 		op := summary.Ops[0]
@@ -366,12 +392,12 @@ func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 	a.SetAsciiVariation(&in, lp)
 	var invert, invertLast byte
 	switch in.Var {
-	case inst.DataAscii:
-	case inst.DataAsciiHi:
+	case inst.VarAscii:
+	case inst.VarAsciiHi:
 		invert = 0x80
-	case inst.DataAsciiFlip:
+	case inst.VarAsciiFlip:
 		invertLast = 0x80
-	case inst.DataAsciiHiFlip:
+	case inst.VarAsciiHiFlip:
 		invert = 0x80
 		invertLast = 0x80
 	default:
@@ -662,6 +688,11 @@ func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 
 	ex.Op = expr.OpLeaf
 	ex.Text = lp.Emit()
+	newL, err := a.FixLabel(ex.Text)
+	if err != nil {
+		return &expr.E{}, in.Errorf("%v", err)
+	}
+	ex.Text = newL
 	return top, nil
 }
 
@@ -680,11 +711,11 @@ func (a *Base) ReplaceMacroArgs(line string, args []string, kwargs map[string]st
 	return line, err
 }
 
-func (a *Base) IsNewParentLabel(label string) bool {
+func (a *Base) DefaultIsNewParentLabel(label string) bool {
 	return label != "" && label[0] != '.'
 }
 
-func (a *Base) FixLabel(label string, macroCall int, locals map[string]bool) (string, error) {
+func (a *Base) DefaultFixLabel(label string) (string, error) {
 	switch {
 	case label == "":
 		return label, nil
@@ -695,6 +726,7 @@ func (a *Base) FixLabel(label string, macroCall int, locals map[string]bool) (st
 			return fmt.Sprintf("%s/%s", last, label), nil
 		}
 	case label[0] == ':':
+		_, macroCall, _ := a.GetMacroCall()
 		if macroCall == 0 {
 			return "", fmt.Errorf("macro-local label '%s' seen outside macro", label)
 		} else {
