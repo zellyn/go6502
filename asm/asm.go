@@ -57,10 +57,6 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return err
 		}
 
-		// if err := in.FixLabels(a.Flavor); err != nil {
-		// 	return err
-		// }
-
 		if _, err := a.passInst(&in, false); err != nil {
 			return err
 		}
@@ -145,7 +141,7 @@ func (a *Assembler) AssembleWithPrefix(filename string, prefix int) error {
 	}
 
 	// Final pass.
-	if _, err := a.Pass(true); err != nil {
+	if err := a.Pass2(); err != nil {
 		return err
 	}
 	return nil
@@ -194,7 +190,6 @@ func (a *Assembler) initPass() {
 func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
 	// fmt.Printf("PLUGH: in.Compute(a.Flavor, true, true) on %s\n", in)
 	isFinal, err = in.Compute(a.Flavor, final)
-	// fmt.Printf("PLUGH: isFinal=%v, in.Final=%v, in.WidthKnown=%v, in.Width=%v\n", isFinal, in.Final, in.WidthKnown, in.Width)
 	if err != nil {
 		return false, err
 	}
@@ -207,27 +202,22 @@ func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
 	return isFinal, nil
 }
 
-// Pass performs an assembly pass. It causes all instructions to set
-// their final width. If final is true, it returns an error for any
-// instruction that cannot be finalized.
-func (a *Assembler) Pass(final bool) (isFinal bool, err error) {
-	// fmt.Printf("PLUGH: Pass(%v): %d instructions\n", final, len(a.Insts))
+// Pass2 performs the second assembly pass. It returns an error for
+// any instruction that cannot be finalized.
+func (a *Assembler) Pass2() error {
 	a.initPass()
 
-	isFinal = true
 	for _, in := range a.Insts {
-		instFinal, err := a.passInst(in, final)
+		instFinal, err := a.passInst(in, true)
 		if err != nil {
-			return false, err
+			return err
 		}
-		if final && !instFinal {
-			return false, in.Errorf("cannot finalize instruction: %s", in)
+		if !instFinal {
+			return in.Errorf("cannot finalize instruction: %s", in)
 		}
-		// fmt.Printf("PLUGH: instFinal=%v, in.Final=%v, in.WidthKnown=%v, in.Width=%v\n", instFinal, in.Final, in.WidthKnown, in.Width)
-		isFinal = isFinal && instFinal
 	}
 
-	return isFinal, nil
+	return nil
 }
 
 // RawBytes returns the raw bytes, sequentially in the order of the

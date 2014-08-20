@@ -26,7 +26,7 @@ const fileChars = Letters + Digits + "."
 type DirectiveInfo struct {
 	Type inst.Type
 	Func func(inst.I, *lines.Parse) (inst.I, error)
-	Var  int
+	Var  inst.Variant
 }
 
 type Requiredness int

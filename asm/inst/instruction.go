@@ -14,7 +14,7 @@ import (
 type Type int
 
 const (
-	TypeUnknown Type = iota
+	TypeUnknown Type = Type(iota)
 
 	TypeNone       // No type (eg. just a label, just a comment, empty, ignored directive)
 	TypeMacroStart // Start of macro definition
@@ -36,20 +36,23 @@ const (
 	TypeSetting    // An on/off setting toggle
 )
 
+type Variant int
+
 // Variants for instructions. These tell the instruction how to
 // interpret the raw data that comes in on the first or second pass.
 const (
-	VarBytes       = iota // Data: expressions, but forced to one byte per
-	VarMixed              // Bytes or words (LE), depending on individual expression widths
-	VarWordsLe            // Data: expressions, but forced to one word per, little-endian
-	VarWordsBe            // Data: expressions, but forced to one word per, big-endian
-	VarAscii              // Data: from ASCII strings, high bit clear
-	VarAsciiFlip          // Data: from ASCII strings, high bit clear, except last char
-	VarAsciiHi            // Data: from ASCII strings, high bit set
-	VarAsciiHiFlip        // Data: from ASCII strings, high bit set, except last char
-	VarRelative           // For branches: a one-byte relative address
-	VarEquNormal          // Equ: a normal equate
-	VarEquPageZero        // Equ: a page-zero equate
+	VarUnknown     = Variant(iota)
+	VarBytes       // Data: expressions, but forced to one byte per
+	VarMixed       // Bytes or words (LE), depending on individual expression widths
+	VarWordsLe     // Data: expressions, but forced to one word per, little-endian
+	VarWordsBe     // Data: expressions, but forced to one word per, big-endian
+	VarAscii       // Data: from ASCII strings, high bit clear
+	VarAsciiFlip   // Data: from ASCII strings, high bit clear, except last char
+	VarAsciiHi     // Data: from ASCII strings, high bit set
+	VarAsciiHiFlip // Data: from ASCII strings, high bit set, except last char
+	VarRelative    // For branches: a one-byte relative address
+	VarEquNormal   // Equ: a normal equate
+	VarEquPageZero // Equ: a page-zero equate
 )
 
 type I struct {
@@ -71,7 +74,7 @@ type I struct {
 	DeclaredLine uint16                 // Line number listed in file
 	Line         *lines.Line            // Line object for this line
 	Addr         uint16                 // Current memory address
-	Var          int                    // Variant of instruction type
+	Var          Variant                // Variant of instruction type
 }
 
 func (i I) TypeString() string {
@@ -215,7 +218,7 @@ func (i *I) Compute(c context.Context, final bool) (bool, error) {
 	return true, nil
 }
 
-// computeLabel attempts to compute equates and label values.
+// computeLabel attempts to compute label values.
 func (i *I) computeLabel(c context.Context, final bool) error {
 	if i.Label == "" {
 		return nil

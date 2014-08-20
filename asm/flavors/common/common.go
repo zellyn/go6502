@@ -73,13 +73,12 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_RELATIVE
-		in.Mode = inst.VarRelative
-		if valKnown && xyzzy {
+		in.Var = inst.VarRelative
+		if valKnown {
 			b, err := RelativeAddr(c, in, val)
 			if err != nil {
 				return in, err
 			}
-			fmt.Printf("b=$%02x\n", b)
 			in.Data = []byte{in.Op, b}
 			in.Final = true
 		}
@@ -175,7 +174,6 @@ func RelativeAddr(c context.Context, in inst.I, val uint16) (byte, error) {
 	if !ok {
 		return 0, in.Errorf("cannot determine current address for '%s'", in.Command)
 	}
-	fmt.Printf("RelativeAddr: curr=%04x, val=%04x\n", curr, val)
 	// Found both current and target addresses
 	offset := int32(val) - (int32(curr) + 2)
 	if offset > 127 {

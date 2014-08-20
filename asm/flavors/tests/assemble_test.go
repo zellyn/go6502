@@ -306,12 +306,9 @@ func TestMultiline(t *testing.T) {
 		if err := tt.a.Load("TESTFILE", 0); err != nil {
 			t.Fatalf(`%d("%s" - %s): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, tt.a.Flavor, err)
 		}
-		isFinal, err := tt.a.Pass(true)
+		err := tt.a.Pass2()
 		if err != nil {
 			t.Fatalf(`%d("%s" - %s): tt.a.Pass(true) failed: %s`, i, tt.name, tt.a.Flavor, err)
-		}
-		if !isFinal {
-			t.Fatalf(`%d("%s" - %s): tt.a.Pass(true) couldn't finalize`, i, tt.name, tt.a.Flavor)
 		}
 
 		if tt.b != "" {
