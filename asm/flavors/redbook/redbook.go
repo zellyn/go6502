@@ -3,6 +3,7 @@ package redbook
 import (
 	"fmt"
 
+	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
@@ -37,6 +38,7 @@ func newRedbook(name string) *RedBook {
 	r.MsbChars = "/"
 	r.ImmediateChars = "#"
 	r.HexCommas = oldschool.ReqOptional
+	r.DefaultOriginVal = 0x0800
 
 	r.Directives = map[string]oldschool.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, r.ParseAddress, 0},
@@ -67,14 +69,16 @@ func newRedbook(name string) *RedBook {
 		"=": expr.OpEq,
 	}
 
-	r.SetOnOffDefaults(map[string]bool{
-		"MSB": true, // MSB defaults to true, as per manual
-		"LST": true, // Display listing: not used
-	})
+	r.InitContextFunc = func(ctx context.Context) {
+		ctx.SetOnOffDefaults(map[string]bool{
+			"MSB": true, // MSB defaults to true, as per manual
+			"LST": true, // Display listing: not used
+		})
+	}
 
-	r.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
+	r.SetAsciiVariation = func(ctx context.Context, in *inst.I, lp *lines.Parse) {
 		if in.Command == "ASC" {
-			if r.Setting("MSB") {
+			if ctx.Setting("MSB") {
 				in.Var = inst.VarAsciiHi
 			} else {
 				in.Var = inst.VarAscii
@@ -92,8 +96,4 @@ func newRedbook(name string) *RedBook {
 	r.IsNewParentLabel = r.DefaultIsNewParentLabel
 
 	return r
-}
-
-func (r *RedBook) LocalMacroLabels() bool {
-	return false
 }

@@ -1,10 +1,10 @@
 package merlin
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
@@ -38,6 +38,8 @@ func New() *Merlin {
 	m.InvCharChars = `"`
 	m.MacroArgSep = ";"
 	m.SuffixForWide = true
+	m.LocalMacroLabelsVal = true
+	m.DefaultOriginVal = 0x8000
 
 	m.Directives = map[string]oldschool.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, m.ParseAddress, 0},
@@ -77,16 +79,18 @@ func New() *Merlin {
 		"!": expr.OpXor,
 	}
 
-	m.SetOnOffDefaults(map[string]bool{
-		"LST":   true,  // Display listing: not used
-		"XC":    false, // Extended commands: not implemented yet
-		"EXP":   false, // How to print macro calls
-		"LSTDO": false, // List conditional code?
-		"TR":    false, // truncate listing to 3 bytes?
-		"CYC":   false, // print cycle times?
-	})
+	m.InitContextFunc = func(ctx context.Context) {
+		ctx.SetOnOffDefaults(map[string]bool{
+			"LST":   true,  // Display listing: not used
+			"XC":    false, // Extended commands: not implemented yet
+			"EXP":   false, // How to print macro calls
+			"LSTDO": false, // List conditional code?
+			"TR":    false, // truncate listing to 3 bytes?
+			"CYC":   false, // print cycle times?
+		})
+	}
 
-	m.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
+	m.SetAsciiVariation = func(ctx context.Context, in *inst.I, lp *lines.Parse) {
 		if in.Command != "ASC" && in.Command != "DCI" {
 			panic(fmt.Sprintf("Unimplemented/unknown ascii directive: '%s'", in.Command))
 		}
@@ -108,11 +112,11 @@ func New() *Merlin {
 	// the "command column" value, which caused isMacroCall to return
 	// true, and the lp to be pointing to the following character
 	// (probably whitespace).
-	m.ParseMacroCall = func(in inst.I, lp *lines.Parse) (inst.I, bool, error) {
+	m.ParseMacroCall = func(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, bool, error) {
 		if in.Command == "" {
 			return in, false, nil
 		}
-		byName := m.HasMacroName(in.Command)
+		byName := ctx.HasMacroName(in.Command)
 
 		// It's not a macro call.
 		if in.Command != ">>>" && in.Command != "PMC" && !byName {
@@ -127,7 +131,7 @@ func New() *Merlin {
 				return in, true, in.Errorf("Expected macro name, got char '%c'", c)
 			}
 			in.Command = lp.Emit()
-			if !m.HasMacroName(in.Command) {
+			if !ctx.HasMacroName(in.Command) {
 				return in, true, in.Errorf("Unknown macro: '%s'", in.Command)
 			}
 			if !lp.Consume(" ./,-(") {
@@ -153,13 +157,13 @@ func New() *Merlin {
 		return in, true, nil
 	}
 
-	m.FixLabel = func(label string) (string, error) {
-		_, macroCount, locals := m.GetMacroCall()
+	m.FixLabel = func(ctx context.Context, label string) (string, error) {
+		_, macroCount, locals := ctx.GetMacroCall()
 		switch {
 		case label == "":
 			return label, nil
 		case label[0] == ':':
-			if last := m.LastLabel(); last == "" {
+			if last := ctx.LastLabel(); last == "" {
 				return "", fmt.Errorf("sublabel '%s' without previous label", label)
 			} else {
 				return fmt.Sprintf("%s/%s", last, label), nil
@@ -178,15 +182,7 @@ func New() *Merlin {
 	return m
 }
 
-func (m *Merlin) Zero() (uint16, error) {
-	return 0, errors.New("Division by zero.")
-}
-
-func (m *Merlin) DefaultOrigin() uint16 {
-	return 0x8000
-}
-
-func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (m *Merlin) ParseInclude(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(whitespace)
 	lp.AcceptUntil(";")
 	filename := strings.TrimSpace(lp.Emit())
@@ -203,8 +199,4 @@ func (m *Merlin) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Width = 0
 	in.Final = true
 	return in, nil
-}
-
-func (m *Merlin) LocalMacroLabels() bool {
-	return true
 }

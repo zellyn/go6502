@@ -3,6 +3,7 @@ package scma
 import (
 	"strings"
 
+	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
@@ -29,6 +30,9 @@ func New() *SCMA {
 	a.ImmediateChars = "#"
 	a.CharChars = "'"
 	a.MacroArgSep = ","
+	a.DefaultOriginVal = 0x0800
+	divZeroVal := uint16(0xffff)
+	a.DivZeroVal = &divZeroVal
 
 	a.Directives = map[string]oldschool.DirectiveInfo{
 		".IN":   {inst.TypeInclude, a.ParseInclude, 0},
@@ -67,7 +71,7 @@ func New() *SCMA {
 		return strings.HasPrefix(s, commentWhitespacePrefix)
 	}
 
-	a.SetAsciiVariation = func(in *inst.I, lp *lines.Parse) {
+	a.SetAsciiVariation = func(ctx context.Context, in *inst.I, lp *lines.Parse) {
 		// For S-C Assembler, leading "-" flips high bit
 		invert := lp.Consume("-")
 		invertLast := in.Command == ".AT"
@@ -87,7 +91,7 @@ func New() *SCMA {
 	// the "command column" value, which caused isMacroCall to return
 	// true, and the lp to be pointing to the following character
 	// (probably whitespace).
-	a.ParseMacroCall = func(in inst.I, lp *lines.Parse) (inst.I, bool, error) {
+	a.ParseMacroCall = func(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, bool, error) {
 		if in.Command == "" || in.Command[0] != '>' {
 			// not a macro call
 			return in, false, nil
@@ -116,12 +120,4 @@ func New() *SCMA {
 	a.IsNewParentLabel = a.DefaultIsNewParentLabel
 
 	return a
-}
-
-func (a *SCMA) Zero() (uint16, error) {
-	return uint16(0xffff), nil
-}
-
-func (a *SCMA) LocalMacroLabels() bool {
-	return false
 }

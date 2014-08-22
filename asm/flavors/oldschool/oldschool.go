@@ -2,6 +2,7 @@ package oldschool
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -25,7 +26,7 @@ const fileChars = Letters + Digits + "."
 
 type DirectiveInfo struct {
 	Type inst.Type
-	Func func(inst.I, *lines.Parse) (inst.I, error)
+	Func func(context.Context, inst.I, *lines.Parse) (inst.I, error)
 	Var  inst.Variant
 }
 
@@ -40,32 +41,34 @@ const (
 // Base implements the S-C Macro Assembler-compatible assembler flavor.
 // See http://www.txbobsc.com/scsc/ and http://stjarnhimlen.se/apple2/
 type Base struct {
-	Name       string
-	Directives map[string]DirectiveInfo
-	Operators  map[string]expr.Operator
-	context.SimpleContext
-	LabelChars        string
-	LabelColons       Requiredness
-	ExplicitARegister Requiredness
-	HexCommas         Requiredness
-	SpacesForComment  int  // this many spaces after command means it's the comment field
-	StringEndOptional bool // can omit closing delimeter from string args?
-	SuffixForWide     bool // is eg. "LDA:" a force-wide on "LDA"? (Merlin)
-	CommentChar       rune
-	BinaryChar        rune
-	MsbChars          string
-	LsbChars          string
-	ImmediateChars    string
-	operatorChars     string
-	CharChars         string
-	InvCharChars      string
-	MacroArgSep       string
-	LocalMacroLabels  bool
-	ExtraCommenty     func(string) bool
-	SetAsciiVariation func(*inst.I, *lines.Parse)
-	ParseMacroCall    func(inst.I, *lines.Parse) (inst.I, bool, error)
-	FixLabel          func(label string) (string, error)
-	IsNewParentLabel  func(label string) bool
+	Name                string
+	Directives          map[string]DirectiveInfo
+	Operators           map[string]expr.Operator
+	LabelChars          string
+	LabelColons         Requiredness
+	ExplicitARegister   Requiredness
+	HexCommas           Requiredness
+	SpacesForComment    int  // this many spaces after command means it's the comment field
+	StringEndOptional   bool // can omit closing delimeter from string args?
+	SuffixForWide       bool // is eg. "LDA:" a force-wide on "LDA"? (Merlin)
+	CommentChar         rune
+	BinaryChar          rune
+	MsbChars            string
+	LsbChars            string
+	ImmediateChars      string
+	operatorChars       string
+	CharChars           string
+	InvCharChars        string
+	MacroArgSep         string
+	ExtraCommenty       func(string) bool
+	SetAsciiVariation   func(context.Context, *inst.I, *lines.Parse)
+	ParseMacroCall      func(context.Context, inst.I, *lines.Parse) (inst.I, bool, error)
+	IsNewParentLabel    func(label string) bool
+	InitContextFunc     func(context.Context)
+	FixLabel            func(context.Context, string) (string, error)
+	LocalMacroLabelsVal bool
+	DivZeroVal          *uint16
+	DefaultOriginVal    uint16
 }
 
 func (a *Base) String() string {
@@ -73,7 +76,7 @@ func (a *Base) String() string {
 }
 
 // Parse an entire instruction, or return an appropriate error.
-func (a *Base) ParseInstr(line lines.Line, quick bool) (inst.I, error) {
+func (a *Base) ParseInstr(ctx context.Context, line lines.Line, quick bool) (inst.I, error) {
 	lp := line.Parse
 	in := inst.I{Line: &line}
 
@@ -125,13 +128,13 @@ func (a *Base) ParseInstr(line lines.Line, quick bool) (inst.I, error) {
 	// If appropriate, set the last parent label.
 	if !quick {
 		parent := a.IsNewParentLabel(in.Label)
-		newL, err := a.FixLabel(in.Label)
+		newL, err := a.FixLabel(ctx, in.Label)
 		if err != nil {
 			return in, in.Errorf("%v", err)
 		}
 		in.Label = newL
 		if parent {
-			a.SetLastLabel(in.Label)
+			ctx.SetLastLabel(in.Label)
 		}
 	}
 
@@ -142,16 +145,12 @@ func (a *Base) ParseInstr(line lines.Line, quick bool) (inst.I, error) {
 		in.Type = inst.TypeNone
 		return in, nil
 	}
-	return a.parseCmd(in, lp, quick)
-}
-
-func (a *Base) DefaultOrigin() uint16 {
-	return 0x0800
+	return a.parseCmd(ctx, in, lp, quick)
 }
 
 // parseCmd parses the "command" part of an instruction: we expect to be
 // looking at a non-whitespace character.
-func (a *Base) parseCmd(in inst.I, lp *lines.Parse, quick bool) (inst.I, error) {
+func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, quick bool) (inst.I, error) {
 	if !lp.AcceptRun(cmdChars) && !(a.Directives["="].Func != nil && lp.Accept("=")) {
 		c := lp.Next()
 		return in, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
@@ -170,7 +169,7 @@ func (a *Base) parseCmd(in inst.I, lp *lines.Parse, quick bool) (inst.I, error) 
 	}
 	// Give ParseMacroCall a chance
 	if a.ParseMacroCall != nil {
-		i, isMacro, err := a.ParseMacroCall(in, lp)
+		i, isMacro, err := a.ParseMacroCall(ctx, in, lp)
 		if err != nil {
 			return in, err
 		}
@@ -185,16 +184,16 @@ func (a *Base) parseCmd(in inst.I, lp *lines.Parse, quick bool) (inst.I, error) 
 		if dir.Func == nil {
 			return in, nil
 		}
-		return dir.Func(in, lp)
+		return dir.Func(ctx, in, lp)
 	}
 
-	if a.HasSetting(in.Command) {
-		return a.parseSetting(in, lp)
+	if ctx.HasSetting(in.Command) {
+		return a.parseSetting(ctx, in, lp)
 	}
 
 	if summary, ok := opcodes.ByName[in.Command]; ok {
 		in.Type = inst.TypeOp
-		return a.parseOpArgs(in, lp, summary, false)
+		return a.parseOpArgs(ctx, in, lp, summary, false)
 	}
 
 	// Merlin lets you say "LDA:" or "LDA@" or "LDAZ" to force non-zero-page.
@@ -203,14 +202,14 @@ func (a *Base) parseCmd(in inst.I, lp *lines.Parse, quick bool) (inst.I, error) 
 		if summary, ok := opcodes.ByName[prefix]; ok {
 			in.Command = prefix
 			in.Type = inst.TypeOp
-			return a.parseOpArgs(in, lp, summary, true)
+			return a.parseOpArgs(ctx, in, lp, summary, true)
 		}
 	}
 
 	return in, in.Errorf(`unknown command/instruction: "%s"`, in.Command)
 }
 
-func (a *Base) parseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) parseSetting(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.Type = inst.TypeSetting
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(Letters) {
@@ -220,9 +219,9 @@ func (a *Base) parseSetting(in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.TextArg = lp.Emit()
 	switch in.TextArg {
 	case "ON":
-		a.SettingOn(in.Command)
+		ctx.SettingOn(in.Command)
 	case "OFF":
-		a.SettingOff(in.Command)
+		ctx.SettingOff(in.Command)
 	default:
 		return in, in.Errorf("expecting ON/OFF, found '%s'", in.TextArg)
 	}
@@ -269,7 +268,7 @@ func (a *Base) parseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 
 // parseOpArgs parses the arguments to an assembly op. We expect to be
 // looking at the first non-op character (probably whitespace)
-func (a *Base) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
+func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
 	// MODE_IMPLIED: we don't really care what comes next: it's a comment.
 	if summary.Modes == opcodes.MODE_IMPLIED {
 		op := summary.Ops[0]
@@ -314,7 +313,7 @@ func (a *Base) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 		return in, in.Errorf("%s doesn't support any indirect modes", in.Command)
 	}
 	xy := '-'
-	expr, err := a.ParseExpression(in, lp)
+	expr, err := a.parseExpression(ctx, in, lp)
 	if err != nil {
 		return in, err
 	}
@@ -371,12 +370,12 @@ func (a *Base) parseOpArgs(in inst.I, lp *lines.Parse, summary opcodes.OpSummary
 		}
 	}
 
-	return common.DecodeOp(a, in, summary, indirect, xy, forceWide)
+	return common.DecodeOp(ctx, in, summary, indirect, xy, forceWide)
 }
 
-func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseAddress(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
-	expr, err := a.ParseExpression(in, lp)
+	expr, err := a.parseExpression(ctx, in, lp)
 	if err != nil {
 		return in, err
 	}
@@ -387,9 +386,9 @@ func (a *Base) ParseAddress(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseAscii(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
-	a.SetAsciiVariation(&in, lp)
+	a.SetAsciiVariation(ctx, &in, lp)
 	var invert, invertLast byte
 	switch in.Var {
 	case inst.VarAscii:
@@ -424,9 +423,9 @@ func (a *Base) ParseAscii(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseBlockStorage(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
-	ex, err := a.ParseExpression(in, lp)
+	ex, err := a.parseExpression(ctx, in, lp)
 	if err != nil {
 		return in, err
 	}
@@ -434,10 +433,10 @@ func (a *Base) ParseBlockStorage(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseData(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	for {
-		ex, err := a.ParseExpression(in, lp)
+		ex, err := a.parseExpression(ctx, in, lp)
 		if err != nil {
 			return in, err
 		}
@@ -449,9 +448,9 @@ func (a *Base) ParseData(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseDo(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
-	expr, err := a.ParseExpression(in, lp)
+	expr, err := a.parseExpression(ctx, in, lp)
 	if err != nil {
 		return in, err
 	}
@@ -462,12 +461,18 @@ func (a *Base) ParseDo(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseEquate(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
-	expr, err := a.ParseExpression(in, lp)
+	expr, err := a.parseExpression(ctx, in, lp)
 	if err != nil {
 		return in, err
 	}
+
+	xyzzy, err := expr.Eval(ctx, in.Line)
+	if err != nil {
+		return in, err
+	}
+	_ = xyzzy
 	in.Exprs = append(in.Exprs, expr)
 	in.WidthKnown = true
 	in.Width = 0
@@ -475,7 +480,7 @@ func (a *Base) ParseEquate(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseHexString(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.AcceptRun(Whitespace)
 	for {
 		lp.Ignore()
@@ -500,7 +505,7 @@ func (a *Base) ParseHexString(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseInclude(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(fileChars) {
 		return in, in.Errorf("Expecting filename, found '%c'", lp.Next())
@@ -513,7 +518,7 @@ func (a *Base) ParseInclude(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 // For assemblers where the macro name follows the macro directive.
-func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseMacroStart(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	if !lp.AcceptRun(cmdChars) {
 		return in, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
@@ -526,7 +531,7 @@ func (a *Base) ParseMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 }
 
 // For assemblers where the macro name is the label, followed by the directive.
-func (a *Base) MarkMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) MarkMacroStart(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.TextArg, in.Label = in.Label, ""
 	in.WidthKnown = true
 	in.Width = 0
@@ -534,18 +539,18 @@ func (a *Base) MarkMacroStart(in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, nil
 }
 
-func (a *Base) ParseNoArgDir(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseNoArgDir(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
 }
 
-func (a *Base) ParseNotImplemented(in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseNotImplemented(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	return in, in.Errorf("not implemented (yet?): %s", in.Command)
 }
 
-func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
+func (a *Base) parseExpression(ctx context.Context, in inst.I, lp *lines.Parse) (*expr.E, error) {
 
 	if a.operatorChars == "" {
 		for k, _ := range a.Operators {
@@ -581,14 +586,14 @@ func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
 		}
 	}
 
-	tree, err := a.ParseTerm(in, lp)
+	tree, err := a.ParseTerm(ctx, in, lp)
 	if err != nil {
 		return &expr.E{}, err
 	}
 
 	for lp.Accept(a.operatorChars) {
 		c := lp.Emit()
-		right, err := a.ParseTerm(in, lp)
+		right, err := a.ParseTerm(ctx, in, lp)
 		if err != nil {
 			return &expr.E{}, err
 		}
@@ -602,7 +607,7 @@ func (a *Base) ParseExpression(in inst.I, lp *lines.Parse) (*expr.E, error) {
 	return tree, nil
 }
 
-func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
+func (a *Base) ParseTerm(ctx context.Context, in inst.I, lp *lines.Parse) (*expr.E, error) {
 	ex := &expr.E{}
 	top := ex
 
@@ -688,7 +693,7 @@ func (a *Base) ParseTerm(in inst.I, lp *lines.Parse) (*expr.E, error) {
 
 	ex.Op = expr.OpLeaf
 	ex.Text = lp.Emit()
-	newL, err := a.FixLabel(ex.Text)
+	newL, err := a.FixLabel(ctx, ex.Text)
 	if err != nil {
 		return &expr.E{}, in.Errorf("%v", err)
 	}
@@ -715,18 +720,18 @@ func (a *Base) DefaultIsNewParentLabel(label string) bool {
 	return label != "" && label[0] != '.'
 }
 
-func (a *Base) DefaultFixLabel(label string) (string, error) {
+func (a *Base) DefaultFixLabel(ctx context.Context, label string) (string, error) {
 	switch {
 	case label == "":
 		return label, nil
 	case label[0] == '.':
-		if last := a.LastLabel(); last == "" {
+		if last := ctx.LastLabel(); last == "" {
 			return "", fmt.Errorf("sublabel '%s' without previous label", label)
 		} else {
 			return fmt.Sprintf("%s/%s", last, label), nil
 		}
 	case label[0] == ':':
-		_, macroCall, _ := a.GetMacroCall()
+		_, macroCall, _ := ctx.GetMacroCall()
 		if macroCall == 0 {
 			return "", fmt.Errorf("macro-local label '%s' seen outside macro", label)
 		} else {
@@ -734,4 +739,25 @@ func (a *Base) DefaultFixLabel(label string) (string, error) {
 		}
 	}
 	return label, nil
+}
+
+func (a *Base) LocalMacroLabels() bool {
+	return a.LocalMacroLabelsVal
+}
+
+func (a *Base) Zero() (uint16, error) {
+	if a.DivZeroVal == nil {
+		return 0, errors.New("Division by zero.")
+	}
+	return *a.DivZeroVal, nil
+}
+
+func (a *Base) DefaultOrigin() uint16 {
+	return a.DefaultOriginVal
+}
+
+func (a *Base) InitContext(ctx context.Context) {
+	if a.InitContextFunc != nil {
+		a.InitContextFunc(ctx)
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/flavors/as65"
 	"github.com/zellyn/go6502/asm/flavors/merlin"
@@ -20,7 +21,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 	mm := merlin.New()
 
 	tests := []struct {
-		a flavors.F // assembler flavor
+		f flavors.F // assembler flavor
 		i string    // input string
 		p string    // printed instruction, expected
 		b string    // bytes, expected
@@ -209,6 +210,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, ` .AT -DABCD`, "{data/b}", "c1c243"},
 		{ss, ` .AT /ABC/`, "{data/b}", "4142c3"},
 		{ss, `>SAM AB,$12,"A B","A, B, "" C"`, `{call SAM {"AB", "$12", "A B", "A, B, \" C"}}`, ""},
+		// {ss, " LDA #3/0", "{LDA/imm (lsb (/ $0003 $0000))}", "a9ff"},
 	}
 
 	// TODO(zellyn): Add tests for finalization of four SCMA directives:
@@ -220,30 +222,32 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		// TODO(zellyn): Test AS65 and Merlin too.
 
 		// Initialize to a known state for testing.
-		tt.a.Clear()
-		tt.a.SetAddr(0x2345)
-		tt.a.Set("A.B", 0x6789)
-		tt.a.Set("C.D", 0x789a)
-		tt.a.Set("L2", 0x6789)
-		tt.a.Set("L3", 0x789a)
-		tt.a.AddMacroName("INCW")
-		tt.a.AddMacroName("M1")
+		ctx := &context.SimpleContext{}
+		ctx.Clear()
+		ctx.SetAddr(0x2345)
+		ctx.Set("A.B", 0x6789)
+		ctx.Set("C.D", 0x789a)
+		ctx.Set("L2", 0x6789)
+		ctx.Set("L3", 0x789a)
+		ctx.AddMacroName("INCW")
+		ctx.AddMacroName("M1")
+		tt.f.InitContext(ctx)
 
-		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i), false)
+		inst, err := tt.f.ParseInstr(ctx, lines.NewSimple(tt.i), false)
 		if err != nil {
-			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.a, tt.i, err)
+			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.f, tt.i, err)
 			continue
 		}
 		if inst.Line.Parse == nil {
 			t.Errorf("Got empty inst.Line.Parse on input '%s'", tt.i)
 		}
-		_, err = inst.Compute(tt.a, true)
+		_, err = inst.Compute(ctx, true)
 		if err != nil {
-			t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.a, true) => error: %s`, i, tt.a, tt.i, inst, err)
+			t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.f, true) => error: %s`, i, tt.f, tt.i, inst, err)
 			continue
 		}
 		if inst.String() != tt.p {
-			t.Errorf(`%d. %s.ParseInstr("%s") = %s; want %s`, i, tt.a, tt.i, inst.String(), tt.p)
+			t.Errorf(`%d. %s.ParseInstr("%s") = %s; want %s`, i, tt.f, tt.i, inst.String(), tt.p)
 			continue
 		}
 
@@ -251,7 +255,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 			hx := hex.EncodeToString(inst.Data)
 			// xxxxxx sets the width, but doesn't expect actual data
 			if hx != tt.b && (len(tt.b) == 0 || tt.b[0] != 'x') {
-				t.Errorf(`%d. %s.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.a, tt.i, hx, tt.b)
+				t.Errorf(`%d. %s.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.f, tt.i, hx, tt.b)
 				continue
 			}
 
@@ -275,7 +279,7 @@ func TestSimpleErrors(t *testing.T) {
 	mm := merlin.New()
 
 	tests := []struct {
-		a flavors.F // assembler flavor
+		f flavors.F // assembler flavor
 		i string    // input string
 	}{
 
@@ -289,13 +293,13 @@ func TestSimpleErrors(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		// TODO(zellyn): Test AS65 and Merlin too.
-		if tt.a != ss {
+		if tt.f != ss {
 			continue
 		}
-		inst, err := tt.a.ParseInstr(lines.NewSimple(tt.i), false)
+		ctx := &context.SimpleContext{}
+		inst, err := tt.f.ParseInstr(ctx, lines.NewSimple(tt.i), false)
 		if err == nil {
-			t.Errorf(`%d. %s.ParseInstr("%s") want err; got %s`, i, tt.a, tt.i, inst)
+			t.Errorf(`%d. %s.ParseInstr("%s") want err; got %s`, i, tt.f, tt.i, inst)
 			continue
 		}
 	}

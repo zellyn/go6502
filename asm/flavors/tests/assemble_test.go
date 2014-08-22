@@ -2,7 +2,6 @@ package flavors
 
 import (
 	"encoding/hex"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -24,15 +23,23 @@ func h(s string) []byte {
 	return b
 }
 
+type asmFactory func() *asm.Assembler
+
 func TestMultiline(t *testing.T) {
 	o := lines.NewTestOpener()
 
-	ss := asm.NewAssembler(scma.New(), o)
-	ra := asm.NewAssembler(redbook.NewRedbookA(), o)
-	mm := asm.NewAssembler(merlin.New(), o)
+	ss := asmFactory(func() *asm.Assembler {
+		return asm.NewAssembler(scma.New(), o)
+	})
+	ra := asmFactory(func() *asm.Assembler {
+		return asm.NewAssembler(redbook.NewRedbookA(), o)
+	})
+	mm := asmFactory(func() *asm.Assembler {
+		return asm.NewAssembler(merlin.New(), o)
+	})
 
 	tests := []struct {
-		a      *asm.Assembler      // assembler
+		af     asmFactory          // assembler factory
 		name   string              // name
 		i      []string            // main file: lines
 		ii     map[string][]string // other files: lines
@@ -293,42 +300,41 @@ func TestMultiline(t *testing.T) {
 		if !tt.active {
 			continue
 		}
-		fmt.Println(tt.name)
+		a := tt.af()
 		if tt.b == "" && len(tt.ps) == 0 {
-			t.Fatalf(`%d("%s" - %s): test case must specify bytes or pieces`, i, tt.name, tt.a.Flavor)
+			t.Fatalf(`%d("%s" - %s): test case must specify bytes or pieces`, i, tt.name, a.Flavor)
 		}
-		tt.a.Reset()
 		o.Clear()
 		o["TESTFILE"] = strings.Join(tt.i, "\n")
 		for k, v := range tt.ii {
 			o[k] = strings.Join(v, "\n")
 		}
-		if err := tt.a.Load("TESTFILE", 0); err != nil {
-			t.Fatalf(`%d("%s" - %s): tt.a.Load("TESTFILE") failed: %s`, i, tt.name, tt.a.Flavor, err)
+		if err := a.Load("TESTFILE", 0); err != nil {
+			t.Fatalf(`%d("%s" - %s): a.Load("TESTFILE") failed: %s`, i, tt.name, a.Flavor, err)
 		}
-		err := tt.a.Pass2()
+		err := a.Pass2()
 		if err != nil {
-			t.Fatalf(`%d("%s" - %s): tt.a.Pass(true) failed: %s`, i, tt.name, tt.a.Flavor, err)
+			t.Fatalf(`%d("%s" - %s): a.Pass(true) failed: %s`, i, tt.name, a.Flavor, err)
 		}
 
 		if tt.b != "" {
-			bb, err := tt.a.RawBytes()
+			bb, err := a.RawBytes()
 			if err != nil {
-				t.Fatalf(`%d("%s" - %s): tt.a.RawBytes() failed: %s`, i, tt.name, tt.a.Flavor, err)
+				t.Fatalf(`%d("%s" - %s): a.RawBytes() failed: %s`, i, tt.name, a.Flavor, err)
 			}
 			hx := hex.EncodeToString(bb)
 			if hx != tt.b {
-				t.Fatalf(`%d("%s" - %s): tt.a.RawBytes()=[%s]; want [%s]`, i, tt.name, tt.a.Flavor, hx, tt.b)
+				t.Fatalf(`%d("%s" - %s): a.RawBytes()=[%s]; want [%s]`, i, tt.name, a.Flavor, hx, tt.b)
 			}
 		}
 		if len(tt.ps) != 0 {
-			m, err := tt.a.Membuf()
+			m, err := a.Membuf()
 			if err != nil {
-				t.Fatalf(`%d("%s" - %s): tt.a.Membuf() failed: %s`, i, tt.name, tt.a.Flavor, err)
+				t.Fatalf(`%d("%s" - %s): a.Membuf() failed: %s`, i, tt.name, a.Flavor, err)
 			}
 			ps := m.Pieces()
 			if !reflect.DeepEqual(ps, tt.ps) {
-				t.Fatalf(`%d("%s" - %s): tt.Membuf().Pieces() = %v; want %v`, i, tt.name, tt.a.Flavor, ps, tt.ps)
+				t.Fatalf(`%d("%s" - %s): tt.Membuf().Pieces() = %v; want %v`, i, tt.name, a.Flavor, ps, tt.ps)
 			}
 		}
 	}

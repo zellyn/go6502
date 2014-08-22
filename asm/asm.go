@@ -5,6 +5,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
@@ -17,13 +18,17 @@ type Assembler struct {
 	Opener lines.Opener
 	Insts  []*inst.I
 	Macros map[string]macros.M
+	Ctx    *context.SimpleContext
 }
 
 func NewAssembler(flavor flavors.F, opener lines.Opener) *Assembler {
+	ctx := &context.SimpleContext{}
+	flavor.InitContext(ctx)
 	return &Assembler{
 		Flavor: flavor,
 		Opener: opener,
 		Macros: make(map[string]macros.M),
+		Ctx:    ctx,
 	}
 }
 
@@ -47,7 +52,7 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			lineSources = lineSources[1:]
 			continue
 		}
-		in, parseErr := a.Flavor.ParseInstr(line, false)
+		in, parseErr := a.Flavor.ParseInstr(a.Ctx, line, false)
 		if len(ifdefs) > 0 && !ifdefs[0] && in.Type != inst.TypeIfdefElse && in.Type != inst.TypeIfdefEnd {
 			// we're in an inactive ifdef branch
 			continue
@@ -83,17 +88,17 @@ func (a *Assembler) Load(filename string, prefix int) error {
 				return in.Errorf(`error calling macro "%s": %v`, m.Name, err)
 			}
 			lineSources = append([]lines.LineSource{subLs}, lineSources...)
-			a.Flavor.PushMacroCall(m.Name, macroCall, m.Locals)
+			a.Ctx.PushMacroCall(m.Name, macroCall, m.Locals)
 		case inst.TypeMacroEnd:
 			// If we reached here, it's in a macro call, not a definition.
-			if !a.Flavor.PopMacroCall() {
+			if !a.Ctx.PopMacroCall() {
 				return in.Errorf("unexpected end of macro")
 			}
 		case inst.TypeIfdef:
 			if len(in.Exprs) == 0 {
 				panic(fmt.Sprintf("Ifdef got parsed with no expression: %s", line))
 			}
-			val, err := in.Exprs[0].Eval(a.Flavor, in.Line)
+			val, err := in.Exprs[0].Eval(a.Ctx, in.Line)
 			if err != nil {
 				return in.Errorf("cannot eval ifdef condition: %v", err)
 			}
@@ -163,14 +168,14 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 		if done {
 			return in.Errorf("end of file while reading macro %s", m.Name)
 		}
-		in2, err := a.Flavor.ParseInstr(line, true)
+		in2, err := a.Flavor.ParseInstr(a.Ctx, line, true)
 		if a.Flavor.LocalMacroLabels() && in2.Label != "" {
 			m.Locals[in2.Label] = true
 		}
 		m.Lines = append(m.Lines, line.Parse.Text())
 		if err == nil && in2.Type == inst.TypeMacroEnd {
 			a.Macros[m.Name] = m
-			a.Flavor.AddMacroName(m.Name)
+			a.Ctx.AddMacroName(m.Name)
 			return nil
 		}
 	}
@@ -178,9 +183,9 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 
 // Clear out stuff that may be hanging around from the previous pass, set origin to default, etc.
 func (a *Assembler) initPass() {
-	a.Flavor.SetLastLabel("") // No last label (yet)
-	a.Flavor.RemoveChanged()  // Remove any variables whose value ever changed.
-	a.Flavor.SetAddr(a.Flavor.DefaultOrigin())
+	a.Ctx.SetLastLabel("") // No last label (yet)
+	a.Ctx.RemoveChanged()  // Remove any variables whose value ever changed.
+	a.Ctx.SetAddr(a.Flavor.DefaultOrigin())
 }
 
 // passInst performs a pass on a single instruction. It forces the
@@ -188,16 +193,15 @@ func (a *Assembler) initPass() {
 // arguments. If final is true, and the instruction cannot be
 // finalized, it returns an error.
 func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
-	// fmt.Printf("PLUGH: in.Compute(a.Flavor, true, true) on %s\n", in)
-	isFinal, err = in.Compute(a.Flavor, final)
+	isFinal, err = in.Compute(a.Ctx, final)
 	if err != nil {
 		return false, err
 	}
 
 	// Update address
-	addr, _ := a.Flavor.GetAddr()
+	addr, _ := a.Ctx.GetAddr()
 	in.Addr = addr
-	a.Flavor.SetAddr(addr + in.Width)
+	a.Ctx.SetAddr(addr + in.Width)
 
 	return isFinal, nil
 }

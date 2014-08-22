@@ -11,16 +11,14 @@ import (
 // AS65 implements the AS65-compatible assembler flavor.
 // See http://www.kingswood-consulting.co.uk/assemblers/
 
-type AS65 struct {
-	context.SimpleContext
-}
+type AS65 struct{}
 
 func New() *AS65 {
 	return &AS65{}
 }
 
 // Parse an entire instruction, or return an appropriate error.
-func (a *AS65) ParseInstr(line lines.Line, quick bool) (inst.I, error) {
+func (a *AS65) ParseInstr(ctx context.Context, line lines.Line, quick bool) (inst.I, error) {
 	return inst.I{}, nil
 }
 
@@ -46,4 +44,7 @@ func (a *AS65) LocalMacroLabels() bool {
 
 func (a *AS65) String() string {
 	return "as65"
+}
+
+func (a *AS65) InitContext(ctx context.Context) {
 }

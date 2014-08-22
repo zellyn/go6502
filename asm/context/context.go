@@ -7,7 +7,8 @@ type Context interface {
 	Get(name string) (uint16, bool)
 	SetAddr(uint16)
 	GetAddr() (uint16, bool)
-	DivZero() (uint16, error)
+	DivZero() *uint16
+	SetDivZero(uint16)
 	RemoveChanged()
 	Clear()
 	SettingOn(name string) error
@@ -19,7 +20,7 @@ type Context interface {
 	PushMacroCall(name string, number int, locals map[string]bool)
 	PopMacroCall() bool
 	GetMacroCall() (string, int, map[string]bool)
-
+	SetOnOffDefaults(map[string]bool)
 	LastLabel() string
 	SetLastLabel(label string)
 }
@@ -39,6 +40,7 @@ type SimpleContext struct {
 	onOffDefaults map[string]bool
 	macroNames    map[string]bool
 	macroCalls    []macroCall
+	divZeroVal    *uint16
 }
 
 type symbolValue struct {
@@ -50,10 +52,6 @@ func (sc *SimpleContext) fix() {
 	if sc.symbols == nil {
 		sc.symbols = make(map[string]symbolValue)
 	}
-}
-
-func (sc *SimpleContext) DivZero() (uint16, error) {
-	return 0, fmt.Errorf("Not implemented: context.SimpleContext.DivZero()")
 }
 
 func (sc *SimpleContext) Get(name string) (uint16, bool) {
@@ -184,4 +182,12 @@ func (sc *SimpleContext) LastLabel() string {
 
 func (sc *SimpleContext) SetLastLabel(l string) {
 	sc.lastLabel = l
+}
+
+func (sc *SimpleContext) DivZero() *uint16 {
+	return sc.divZeroVal
+}
+
+func (sc *SimpleContext) SetDivZero(val uint16) {
+	sc.divZeroVal = &val
 }

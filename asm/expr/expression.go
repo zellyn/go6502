@@ -174,7 +174,11 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 			return 0, nil
 		case OpDiv:
 			if r == 0 {
-				return ctx.DivZero()
+				z := ctx.DivZero()
+				if z == nil {
+					return 0, ln.Errorf("divizion by zero")
+				}
+				return *z, nil
 			}
 			return l / r, nil
 		case OpAnd:
