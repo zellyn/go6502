@@ -125,3 +125,17 @@ http://twimgs.com/informationweek/byte/archive/Apple-II-Description/The-Apple-II
 * Horrible error messages
 ** redbooka
        CPY   $#0 COMMENT TEXT
+
+* The plan
+- Make instructions simple data.
+- Make the first pass do almost everything: pass two just sees data variants.
+
+It's a bit tricky:
+
+1. Parse instruction.
+  1. Set the org/target immediately, updating current address.
+  2. Set the current label.
+  3. Force equates to evaluate immediately.
+  4. Evaluate instructions.
+
+
