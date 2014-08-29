@@ -32,6 +32,11 @@ func NewAssembler(flavor flavors.F, opener lines.Opener) *Assembler {
 	}
 }
 
+type ifdef struct {
+	active bool
+	in     inst.I
+}
+
 // Load loads a new assembler file, deleting any previous data.
 func (a *Assembler) Load(filename string, prefix int) error {
 	a.initPass()
@@ -41,7 +46,7 @@ func (a *Assembler) Load(filename string, prefix int) error {
 		return err
 	}
 	lineSources := []lines.LineSource{ls}
-	ifdefs := []bool{}
+	ifdefs := []ifdef{}
 	macroCall := 0
 	for len(lineSources) > 0 {
 		line, done, err := lineSources[0].Next()
@@ -52,14 +57,18 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			lineSources = lineSources[1:]
 			continue
 		}
-		in, parseErr := a.Flavor.ParseInstr(a.Ctx, line, false)
-		if len(ifdefs) > 0 && !ifdefs[0] && in.Type != inst.TypeIfdefElse && in.Type != inst.TypeIfdefEnd {
-			// we're in an inactive ifdef branch
+		inactive := len(ifdefs) > 0 && !ifdefs[0].active
+		mode := flavors.ParseModeNormal
+		if inactive {
+			mode = flavors.ParseModeInactive
+		}
+		in, parseErr := a.Flavor.ParseInstr(a.Ctx, line, mode)
+		if inactive && in.Type != inst.TypeIfdefElse && in.Type != inst.TypeIfdefEnd {
+			// we're still in an inactive ifdef branch
 			continue
 		}
-
-		if err != nil {
-			return err
+		if parseErr != nil {
+			return parseErr
 		}
 
 		if _, err := a.passInst(&in, false); err != nil {
@@ -102,13 +111,13 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			if err != nil {
 				return in.Errorf("cannot eval ifdef condition: %v", err)
 			}
-			ifdefs = append([]bool{val != 0}, ifdefs...)
+			ifdefs = append([]ifdef{{val != 0, in}}, ifdefs...)
 
 		case inst.TypeIfdefElse:
 			if len(ifdefs) == 0 {
 				return in.Errorf("ifdef else branch encountered outside ifdef: %s", line)
 			}
-			ifdefs[0] = !ifdefs[0]
+			ifdefs[0].active = !ifdefs[0].active
 		case inst.TypeIfdefEnd:
 			if len(ifdefs) == 0 {
 				return in.Errorf("ifdef end encountered outside ifdef: %s", line)
@@ -131,6 +140,9 @@ func (a *Assembler) Load(filename string, prefix int) error {
 		default:
 		}
 		a.Insts = append(a.Insts, &in)
+	}
+	if len(ifdefs) > 0 {
+		return ifdefs[0].in.Errorf("Ifdef not closed before end of file")
 	}
 	return nil
 }
@@ -168,7 +180,7 @@ func (a *Assembler) readMacro(in inst.I, ls lines.LineSource) error {
 		if done {
 			return in.Errorf("end of file while reading macro %s", m.Name)
 		}
-		in2, err := a.Flavor.ParseInstr(a.Ctx, line, true)
+		in2, err := a.Flavor.ParseInstr(a.Ctx, line, flavors.ParseModeMacroSave)
 		if a.Flavor.LocalMacroLabels() && in2.Label != "" {
 			m.Locals[in2.Label] = true
 		}
@@ -193,13 +205,17 @@ func (a *Assembler) initPass() {
 // arguments. If final is true, and the instruction cannot be
 // finalized, it returns an error.
 func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
+	if in.Type == inst.TypeOrg {
+		a.Ctx.SetAddr(in.Addr)
+		return true, nil
+	}
 	isFinal, err = in.Compute(a.Ctx, final)
 	if err != nil {
 		return false, err
 	}
 
 	// Update address
-	addr, _ := a.Ctx.GetAddr()
+	addr := a.Ctx.GetAddr()
 	in.Addr = addr
 	a.Ctx.SetAddr(addr + in.Width)
 

@@ -6,7 +6,7 @@ type Context interface {
 	Set(name string, value uint16)
 	Get(name string) (uint16, bool)
 	SetAddr(uint16)
-	GetAddr() (uint16, bool)
+	GetAddr() uint16
 	DivZero() *uint16
 	SetDivZero(uint16)
 	RemoveChanged()
@@ -33,7 +33,7 @@ type macroCall struct {
 
 type SimpleContext struct {
 	symbols       map[string]symbolValue
-	addr          int32
+	addr          uint16
 	lastLabel     string
 	highbit       byte // OR-mask for ASCII high bit
 	onOff         map[string]bool
@@ -56,7 +56,7 @@ func (sc *SimpleContext) fix() {
 
 func (sc *SimpleContext) Get(name string) (uint16, bool) {
 	if name == "*" {
-		return sc.GetAddr()
+		return sc.GetAddr(), true
 	}
 	sc.fix()
 	s, found := sc.symbols[name]
@@ -64,14 +64,11 @@ func (sc *SimpleContext) Get(name string) (uint16, bool) {
 }
 
 func (sc *SimpleContext) SetAddr(addr uint16) {
-	sc.addr = int32(addr)
+	sc.addr = addr
 }
 
-func (sc *SimpleContext) GetAddr() (uint16, bool) {
-	if sc.addr == -1 {
-		return 0, false
-	}
-	return uint16(sc.addr), true
+func (sc *SimpleContext) GetAddr() uint16 {
+	return sc.addr
 }
 
 func (sc *SimpleContext) Set(name string, value uint16) {

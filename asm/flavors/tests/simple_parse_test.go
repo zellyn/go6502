@@ -10,6 +10,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/merlin"
 	"github.com/zellyn/go6502/asm/flavors/redbook"
 	"github.com/zellyn/go6502/asm/flavors/scma"
+	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 )
 
@@ -233,26 +234,29 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		ctx.AddMacroName("M1")
 		tt.f.InitContext(ctx)
 
-		inst, err := tt.f.ParseInstr(ctx, lines.NewSimple(tt.i), false)
+		in, err := tt.f.ParseInstr(ctx, lines.NewSimple(tt.i), flavors.ParseModeNormal)
 		if err != nil {
 			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.f, tt.i, err)
 			continue
 		}
-		if inst.Line.Parse == nil {
-			t.Errorf("Got empty inst.Line.Parse on input '%s'", tt.i)
+		if in.Line.Parse == nil {
+			t.Errorf("Got empty in.Line.Parse on input '%s'", tt.i)
 		}
-		_, err = inst.Compute(ctx, true)
-		if err != nil {
-			t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.f, true) => error: %s`, i, tt.f, tt.i, inst, err)
-			continue
+		if in.Type != inst.TypeOrg {
+			_, err = in.Compute(ctx, true)
+
+			if err != nil {
+				t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.f, true) => error: %s`, i, tt.f, tt.i, in, err)
+				continue
+			}
 		}
-		if inst.String() != tt.p {
-			t.Errorf(`%d. %s.ParseInstr("%s") = %s; want %s`, i, tt.f, tt.i, inst.String(), tt.p)
+		if in.String() != tt.p {
+			t.Errorf(`%d. %s.ParseInstr("%s") = %s; want %s`, i, tt.f, tt.i, in.String(), tt.p)
 			continue
 		}
 
 		if tt.b != "?" {
-			hx := hex.EncodeToString(inst.Data)
+			hx := hex.EncodeToString(in.Data)
 			// xxxxxx sets the width, but doesn't expect actual data
 			if hx != tt.b && (len(tt.b) == 0 || tt.b[0] != 'x') {
 				t.Errorf(`%d. %s.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.f, tt.i, hx, tt.b)
@@ -261,12 +265,12 @@ func TestSimpleCommonFunctions(t *testing.T) {
 
 			// Check length
 			w := uint16(len(tt.b) / 2)
-			if !inst.WidthKnown {
-				t.Errorf(`%d. %s.WidthKnown is false`, i, inst)
+			if !in.WidthKnown {
+				t.Errorf(`%d. %s.WidthKnown is false`, i, in)
 				continue
 			}
-			if inst.Width != w {
-				t.Errorf(`%d. %s.Width=%d; want %d`, i, inst, inst.Width, w)
+			if in.Width != w {
+				t.Errorf(`%d. %s.Width=%d; want %d`, i, in, in.Width, w)
 				continue
 			}
 		}
@@ -297,9 +301,9 @@ func TestSimpleErrors(t *testing.T) {
 			continue
 		}
 		ctx := &context.SimpleContext{}
-		inst, err := tt.f.ParseInstr(ctx, lines.NewSimple(tt.i), false)
+		in, err := tt.f.ParseInstr(ctx, lines.NewSimple(tt.i), flavors.ParseModeNormal)
 		if err == nil {
-			t.Errorf(`%d. %s.ParseInstr("%s") want err; got %s`, i, tt.f, tt.i, inst)
+			t.Errorf(`%d. %s.ParseInstr("%s") want err; got %s`, i, tt.f, tt.i, in)
 			continue
 		}
 	}

@@ -41,7 +41,7 @@ func newRedbook(name string) *RedBook {
 	r.DefaultOriginVal = 0x0800
 
 	r.Directives = map[string]oldschool.DirectiveInfo{
-		"ORG":    {inst.TypeOrg, r.ParseAddress, 0},
+		"ORG":    {inst.TypeOrg, r.ParseOrg, 0},
 		"OBJ":    {inst.TypeNone, nil, 0},
 		"ENDASM": {inst.TypeEnd, r.ParseNoArgDir, 0},
 		"EQU":    {inst.TypeEqu, r.ParseEquate, inst.VarEquNormal},
@@ -59,6 +59,12 @@ func newRedbook(name string) *RedBook {
 		"REP":    {inst.TypeNone, nil, 0}, // Repeat character
 		"CHR":    {inst.TypeNone, nil, 0}, // Set repeated character
 	}
+
+	r.EquateDirectives = map[string]bool{
+		"EQU": true,
+		"EPZ": true,
+	}
+
 	r.Operators = map[string]expr.Operator{
 		"*": expr.OpMul,
 		"/": expr.OpDiv,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
+	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/flavors/common"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
@@ -44,6 +45,7 @@ type Base struct {
 	Name                string
 	Directives          map[string]DirectiveInfo
 	Operators           map[string]expr.Operator
+	EquateDirectives    map[string]bool
 	LabelChars          string
 	LabelColons         Requiredness
 	ExplicitARegister   Requiredness
@@ -76,7 +78,7 @@ func (a *Base) String() string {
 }
 
 // Parse an entire instruction, or return an appropriate error.
-func (a *Base) ParseInstr(ctx context.Context, line lines.Line, quick bool) (inst.I, error) {
+func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.ParseMode) (inst.I, error) {
 	lp := line.Parse
 	in := inst.I{Line: &line}
 
@@ -124,49 +126,87 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, quick bool) (ins
 		}
 	}
 
-	// Handle the label: munge for macros, relative labels, etc.
-	// If appropriate, set the last parent label.
-	if !quick {
-		parent := a.IsNewParentLabel(in.Label)
-		newL, err := a.FixLabel(ctx, in.Label)
-		if err != nil {
-			return in, in.Errorf("%v", err)
-		}
-		in.Label = newL
-		if parent {
-			ctx.SetLastLabel(in.Label)
-		}
-	}
-
 	// Ignore whitespace at the start or after the label.
 	lp.IgnoreRun(Whitespace)
 
 	if lp.Peek() == lines.Eol || lp.Peek() == a.CommentChar {
 		in.Type = inst.TypeNone
+		if mode == flavors.ParseModeNormal {
+			if err := a.handleLabel(ctx, in); err != nil {
+				return in, err
+			}
+		}
 		return in, nil
 	}
-	return a.parseCmd(ctx, in, lp, quick)
+	return a.parseCmd(ctx, in, lp, mode)
+}
+
+func (a *Base) handleLabel(ctx context.Context, in inst.I) error {
+	if in.Label == "" {
+		return nil
+	}
+	addr := ctx.GetAddr()
+
+	// Munge for macros, relative labels, etc.  If appropriate,
+	// set the last parent label.
+	parent := a.IsNewParentLabel(in.Label)
+	newL, err := a.FixLabel(ctx, in.Label)
+	if err != nil {
+		return in.Errorf("%v", err)
+	}
+	in.Label = newL
+	if parent {
+		ctx.SetLastLabel(in.Label)
+	}
+
+	lval, lok := ctx.Get(in.Label)
+	if lok && addr != lval {
+		return in.Errorf("Trying to set label '%s' to $%04x, but it already has value $%04x", in.Label, addr, lval)
+	}
+	ctx.Set(in.Label, addr)
+	return nil
 }
 
 // parseCmd parses the "command" part of an instruction: we expect to be
 // looking at a non-whitespace character.
-func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, quick bool) (inst.I, error) {
+func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode flavors.ParseMode) (inst.I, error) {
 	if !lp.AcceptRun(cmdChars) && !(a.Directives["="].Func != nil && lp.Accept("=")) {
 		c := lp.Next()
 		return in, in.Errorf("expecting instruction, found '%c' (%d)", c, c)
 	}
 	in.Command = lp.Emit()
 
-	if quick {
+	if mode == flavors.ParseModeMacroSave {
 		// all we care about is labels (already covered) and end-of-macro.
 		if dir, ok := a.Directives[in.Command]; ok {
 			if dir.Type == inst.TypeMacroEnd {
 				in.Type = inst.TypeMacroEnd
 			}
-			return in, nil
 		}
-
+		return in, nil
 	}
+
+	if mode == flavors.ParseModeInactive {
+		// all we care about are endif and else.
+		if dir, ok := a.Directives[in.Command]; ok {
+			if dir.Type == inst.TypeIfdefElse || dir.Type == inst.TypeIfdefEnd {
+				in.Type = dir.Type
+				// It's weird, but handle labels on else/endif lines.
+				if err := a.handleLabel(ctx, in); err != nil {
+					return in, err
+				}
+			}
+		}
+		return in, nil
+	}
+
+	// We don't need to handle labels if it's an equate.
+	if !a.EquateDirectives[in.Command] {
+		if err := a.handleLabel(ctx, in); err != nil {
+			return in, err
+		}
+	}
+
 	// Give ParseMacroCall a chance
 	if a.ParseMacroCall != nil {
 		i, isMacro, err := a.ParseMacroCall(ctx, in, lp)
@@ -269,6 +309,7 @@ func (a *Base) parseQuoted(in inst.I, lp *lines.Parse) (string, error) {
 // parseOpArgs parses the arguments to an assembly op. We expect to be
 // looking at the first non-op character (probably whitespace)
 func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summary opcodes.OpSummary, forceWide bool) (inst.I, error) {
+
 	// MODE_IMPLIED: we don't really care what comes next: it's a comment.
 	if summary.Modes == opcodes.MODE_IMPLIED {
 		op := summary.Ops[0]
@@ -373,16 +414,21 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 	return common.DecodeOp(ctx, in, summary, indirect, xy, forceWide)
 }
 
-func (a *Base) ParseAddress(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
+func (a *Base) ParseOrg(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	expr, err := a.parseExpression(ctx, in, lp)
 	if err != nil {
 		return in, err
 	}
 	in.Exprs = append(in.Exprs, expr)
+	val, err := expr.Eval(ctx, in.Line)
+	if err != nil {
+		return in, err
+	}
 	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
+	in.Addr = val
 	return in, nil
 }
 

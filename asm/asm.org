@@ -133,8 +133,8 @@ http://twimgs.com/informationweek/byte/archive/Apple-II-Description/The-Apple-II
 It's a bit tricky:
 
 1. Parse instruction.
-  1. Set the org/target immediately, updating current address.
-  2. Set the current label.
+  1. Set the current label to the current address, unless it's an equate
+  2. Set the org/target immediately, updating current address.
   3. Force equates to evaluate immediately.
   4. Evaluate instructions.
 

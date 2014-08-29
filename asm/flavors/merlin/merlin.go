@@ -42,7 +42,7 @@ func New() *Merlin {
 	m.DefaultOriginVal = 0x8000
 
 	m.Directives = map[string]oldschool.DirectiveInfo{
-		"ORG":    {inst.TypeOrg, m.ParseAddress, 0},
+		"ORG":    {inst.TypeOrg, m.ParseOrg, 0},
 		"OBJ":    {inst.TypeNone, nil, 0},
 		"ENDASM": {inst.TypeEnd, m.ParseNoArgDir, 0},
 		"=":      {inst.TypeEqu, m.ParseEquate, inst.VarEquNormal},
@@ -66,6 +66,11 @@ func New() *Merlin {
 		"PUT":    {inst.TypeInclude, m.ParseInclude, 0},
 		"USE":    {inst.TypeInclude, m.ParseInclude, 0},
 	}
+
+	m.EquateDirectives = map[string]bool{
+		"=": true,
+	}
+
 	m.Operators = map[string]expr.Operator{
 		"*": expr.OpMul,
 		"/": expr.OpDiv,

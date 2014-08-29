@@ -192,11 +192,13 @@ func (i I) String() string {
 
 // Compute attempts to finalize the instruction.
 func (i *I) Compute(c context.Context, final bool) (bool, error) {
-	if i.Type == TypeEqu || i.Type == TypeTarget || i.Type == TypeOrg {
-		return i.computeMustKnow(c, final)
+	// xyzzy - remove
+	if i.Type == TypeOrg {
+		panic("Compute called with TypeOrg")
+		return true, nil
 	}
-	if err := i.computeLabel(c, final); err != nil {
-		return false, err
+	if i.Type == TypeEqu || i.Type == TypeTarget {
+		return i.computeMustKnow(c, final)
 	}
 	if i.Final {
 		return true, nil
@@ -216,29 +218,6 @@ func (i *I) Compute(c context.Context, final bool) (bool, error) {
 	i.Final = true
 
 	return true, nil
-}
-
-// computeLabel attempts to compute label values.
-func (i *I) computeLabel(c context.Context, final bool) error {
-	if i.Label == "" {
-		return nil
-	}
-
-	if i.Type == TypeEqu {
-		panic("computeLabel should not be called for equates")
-	}
-
-	addr, aok := c.GetAddr()
-	if !aok {
-		return nil
-	}
-
-	lval, lok := c.Get(i.Label)
-	if lok && addr != lval {
-		return i.Errorf("Trying to set label '%s' to $%04x, but it already has value $%04x", i.Label, addr, lval)
-	}
-	c.Set(i.Label, addr)
-	return nil
 }
 
 func (i *I) computeData(c context.Context, final bool) (bool, error) {
@@ -335,9 +314,6 @@ func (i *I) computeMustKnow(c context.Context, final bool) (bool, error) {
 		// Don't handle labels.
 		return true, nil
 	}
-	if err := i.computeLabel(c, final); err != nil {
-		return false, err
-	}
 	return true, nil
 }
 
@@ -401,14 +377,7 @@ func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 
 	// It's a branch
 	if i.Mode == opcodes.MODE_RELATIVE {
-		curr, ok := c.GetAddr()
-		if !ok {
-			if final {
-				return false, i.Errorf("cannot determine current address for '%s'", i.Command)
-			}
-			return false, nil
-		}
-		// Found both current and target addresses
+		curr := c.GetAddr()
 		offset := int32(val) - (int32(curr) + 2)
 		if offset > 127 {
 			return false, i.Errorf("%s cannot jump forward %d (max 127) from $%04x to $%04x", i.Command, offset, curr+2, val)

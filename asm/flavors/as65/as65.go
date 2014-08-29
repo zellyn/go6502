@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/zellyn/go6502/asm/context"
+	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 )
@@ -18,7 +19,7 @@ func New() *AS65 {
 }
 
 // Parse an entire instruction, or return an appropriate error.
-func (a *AS65) ParseInstr(ctx context.Context, line lines.Line, quick bool) (inst.I, error) {
+func (a *AS65) ParseInstr(ctx context.Context, line lines.Line, mode flavors.ParseMode) (inst.I, error) {
 	return inst.I{}, nil
 }
 

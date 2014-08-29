@@ -170,11 +170,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 }
 
 func RelativeAddr(c context.Context, in inst.I, val uint16) (byte, error) {
-	curr, ok := c.GetAddr()
-	if !ok {
-		return 0, in.Errorf("cannot determine current address for '%s'", in.Command)
-	}
-	// Found both current and target addresses
+	curr := c.GetAddr()
 	offset := int32(val) - (int32(curr) + 2)
 	if offset > 127 {
 		return 0, in.Errorf("%s cannot jump forward %d (max 127) from $%04x to $%04x", in.Command, offset, curr+2, val)

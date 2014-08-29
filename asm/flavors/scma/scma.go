@@ -36,7 +36,7 @@ func New() *SCMA {
 
 	a.Directives = map[string]oldschool.DirectiveInfo{
 		".IN":   {inst.TypeInclude, a.ParseInclude, 0},
-		".OR":   {inst.TypeOrg, a.ParseAddress, 0},
+		".OR":   {inst.TypeOrg, a.ParseOrg, 0},
 		".TA":   {inst.TypeTarget, a.ParseNotImplemented, 0},
 		".TF":   {inst.TypeNone, nil, 0},
 		".EN":   {inst.TypeEnd, a.ParseNoArgDir, 0},
@@ -56,6 +56,11 @@ func New() *SCMA {
 		".EM":   {inst.TypeMacroEnd, a.ParseNoArgDir, 0},
 		".US":   {inst.TypeNone, a.ParseNotImplemented, 0},
 	}
+
+	a.EquateDirectives = map[string]bool{
+		".EQ": true,
+	}
+
 	a.Operators = map[string]expr.Operator{
 		"*": expr.OpMul,
 		"/": expr.OpDiv,
