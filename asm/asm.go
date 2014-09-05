@@ -71,6 +71,10 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return parseErr
 		}
 
+		if mode == flavors.ParseModeNormal && !in.WidthKnown {
+			return in.Errorf("Width unknown")
+		}
+
 		if _, err := a.passInst(&in, false); err != nil {
 			return err
 		}

@@ -32,6 +32,11 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.WidthKnown = true
 			in.Width = 2
 			in.Mode = opcodes.MODE_INDIRECT_X
+			in.Var = inst.VarOpByte
+			if valKnown {
+				in.Final = true
+				in.Data = []byte{in.Op, byte(val)}
+			}
 			return in, nil
 		case 'y':
 			op, ok := summary.OpForMode(opcodes.MODE_INDIRECT_Y)
@@ -45,6 +50,11 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Width = 2
 			in.Mode = opcodes.MODE_INDIRECT_Y
 			in.Op = op.Byte
+			in.Var = inst.VarOpByte
+			if valKnown {
+				in.Final = true
+				in.Data = []byte{in.Op, byte(val)}
+			}
 			return in, nil
 		default:
 			op, ok := summary.OpForMode(opcodes.MODE_INDIRECT)
@@ -55,6 +65,11 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.WidthKnown = true
 			in.Width = 3
 			in.Mode = opcodes.MODE_INDIRECT
+			in.Var = inst.VarOpWord
+			if valKnown {
+				in.Final = true
+				in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
+			}
 			return in, nil
 		}
 	}
@@ -73,7 +88,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_RELATIVE
-		in.Var = inst.VarRelative
+		in.Var = inst.VarOpBranch
 		if valKnown {
 			b, err := RelativeAddr(c, in, val)
 			if err != nil {
@@ -82,7 +97,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Data = []byte{in.Op, b}
 			in.Final = true
 		}
-
 		return in, nil
 	}
 
@@ -96,8 +110,11 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_IMMEDIATE
-		in.Var = inst.VarBytes
-		//xyzzy()
+		in.Var = inst.VarOpByte
+		if valKnown {
+			in.Data = []byte{in.Op, byte(val)}
+			in.Final = true
+		}
 		return in, nil
 	}
 

@@ -239,6 +239,10 @@ func TestSimpleCommonFunctions(t *testing.T) {
 			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.f, tt.i, err)
 			continue
 		}
+		if !in.WidthKnown {
+			t.Errorf(`%d. %s.ParseInstr("%s") => WidthKnown=false`, i, tt.f, tt.i)
+			continue
+		}
 		if in.Line.Parse == nil {
 			t.Errorf("Got empty in.Line.Parse on input '%s'", tt.i)
 		}

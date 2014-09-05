@@ -101,6 +101,9 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.Par
 	// Flavor considers this line extra commenty for some reason?
 	if a.ExtraCommenty != nil && a.ExtraCommenty(lp.Rest()) {
 		in.Type = inst.TypeNone
+		in.Final = true
+		in.WidthKnown = true
+		in.Width = 0
 		return in, nil
 	}
 
@@ -108,6 +111,9 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.Par
 	trimmed := strings.TrimSpace(lp.Rest())
 	if trimmed == "" || trimmed[0] == '*' || rune(trimmed[0]) == a.CommentChar {
 		in.Type = inst.TypeNone
+		in.Final = true
+		in.WidthKnown = true
+		in.Width = 0
 		return in, nil
 	}
 
@@ -136,6 +142,9 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.Par
 				return in, err
 			}
 		}
+		in.Final = true
+		in.WidthKnown = true
+		in.Width = 0
 		return in, nil
 	}
 	return a.parseCmd(ctx, in, lp, mode)
@@ -179,9 +188,7 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 	if mode == flavors.ParseModeMacroSave {
 		// all we care about is labels (already covered) and end-of-macro.
 		if dir, ok := a.Directives[in.Command]; ok {
-			if dir.Type == inst.TypeMacroEnd {
-				in.Type = inst.TypeMacroEnd
-			}
+			in.Type = dir.Type
 		}
 		return in, nil
 	}
@@ -189,8 +196,8 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 	if mode == flavors.ParseModeInactive {
 		// all we care about are endif and else.
 		if dir, ok := a.Directives[in.Command]; ok {
+			in.Type = dir.Type
 			if dir.Type == inst.TypeIfdefElse || dir.Type == inst.TypeIfdefEnd {
-				in.Type = dir.Type
 				// It's weird, but handle labels on else/endif lines.
 				if err := a.handleLabel(ctx, in); err != nil {
 					return in, err
@@ -214,6 +221,9 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 			return in, err
 		}
 		if isMacro {
+			i.WidthKnown = true
+			i.Width = 0
+			i.Final = true
 			return i, nil
 		}
 	}
@@ -222,6 +232,9 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 		in.Type = dir.Type
 		in.Var = dir.Var
 		if dir.Func == nil {
+			in.WidthKnown = true
+			in.Width = 0
+			in.Final = true
 			return in, nil
 		}
 		return dir.Func(ctx, in, lp)
@@ -265,6 +278,9 @@ func (a *Base) parseSetting(ctx context.Context, in inst.I, lp *lines.Parse) (in
 	default:
 		return in, in.Errorf("expecting ON/OFF, found '%s'", in.TextArg)
 	}
+	in.WidthKnown = true
+	in.Width = 0
+	in.Final = true
 	return in, nil
 
 }
@@ -466,6 +482,9 @@ func (a *Base) ParseAscii(ctx context.Context, in inst.I, lp *lines.Parse) (inst
 			in.Data[i] ^= invertLast
 		}
 	}
+	in.Width = uint16(len(in.Data))
+	in.WidthKnown = true
+	in.Final = true
 	return in, nil
 }
 
@@ -476,6 +495,14 @@ func (a *Base) ParseBlockStorage(ctx context.Context, in inst.I, lp *lines.Parse
 		return in, err
 	}
 	in.Exprs = append(in.Exprs, ex)
+	val, err := ex.Eval(ctx, in.Line)
+	if err != nil {
+		return in, in.Errorf("Cannot evaluate size of block storage on first pass")
+	}
+
+	in.WidthKnown = true
+	in.Final = true
+	in.Width = val
 	return in, nil
 }
 
@@ -490,6 +517,60 @@ func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.
 		if !lp.Consume(",") {
 			break
 		}
+	}
+	switch in.Var {
+	case inst.VarBytes:
+		in.WidthKnown = true
+		in.Width = uint16(len(in.Exprs))
+		in.Final = true
+		for _, expr := range in.Exprs {
+			val, err := expr.Eval(ctx, in.Line)
+			if err != nil {
+				in.Final = false
+				in.Data = nil
+			}
+			in.Data = append(in.Data, byte(val))
+		}
+	case inst.VarWordsLe, inst.VarWordsBe:
+		in.WidthKnown = true
+		in.Width = 2 * uint16(len(in.Exprs))
+		in.Final = true
+		for _, expr := range in.Exprs {
+			val, err := expr.Eval(ctx, in.Line)
+			if err != nil {
+				in.Final = false
+				in.Data = nil
+			}
+			if in.Var == inst.VarWordsLe {
+				in.Data = append(in.Data, byte(val), byte(val>>8))
+			} else {
+				in.Data = append(in.Data, byte(val>>8), byte(val))
+			}
+		}
+	case inst.VarMixed:
+		in.WidthKnown = true
+		in.Final = true
+		for _, expr := range in.Exprs {
+			in.Width += expr.Width()
+			val, err := expr.Eval(ctx, in.Line)
+			if err != nil {
+				in.Final = false
+				in.Data = nil
+			} else {
+				if in.Final {
+					switch expr.Width() {
+					case 1:
+						in.Data = append(in.Data, byte(val))
+					case 2:
+						in.Data = append(in.Data, byte(val), byte(val>>8))
+					default:
+						return in, in.Errorf("Unsupported expression width: %d", expr.Width())
+					}
+				}
+			}
+		}
+	default:
+		return in, in.Errorf("Unknown Var(%d) with ParseData for %s", in.Var, in.Command)
 	}
 	return in, nil
 }
@@ -548,6 +629,9 @@ func (a *Base) ParseHexString(ctx context.Context, in inst.I, lp *lines.Parse) (
 			break
 		}
 	}
+	in.WidthKnown = true
+	in.Width = uint16(len(in.Data))
+	in.Final = true
 	return in, nil
 }
 

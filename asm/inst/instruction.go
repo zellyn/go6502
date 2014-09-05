@@ -53,6 +53,9 @@ const (
 	VarRelative    // For branches: a one-byte relative address
 	VarEquNormal   // Equ: a normal equate
 	VarEquPageZero // Equ: a page-zero equate
+	VarOpByte      // An op with a one-byte argument
+	VarOpWord      // An op with a one-word argument
+	VarOpBranch    // An op with a one-byte relative address argument
 )
 
 type I struct {
