@@ -102,7 +102,6 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.Par
 	if a.ExtraCommenty != nil && a.ExtraCommenty(lp.Rest()) {
 		in.Type = inst.TypeNone
 		in.Final = true
-		in.WidthKnown = true
 		in.Width = 0
 		return in, nil
 	}
@@ -112,7 +111,6 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.Par
 	if trimmed == "" || trimmed[0] == '*' || rune(trimmed[0]) == a.CommentChar {
 		in.Type = inst.TypeNone
 		in.Final = true
-		in.WidthKnown = true
 		in.Width = 0
 		return in, nil
 	}
@@ -143,7 +141,6 @@ func (a *Base) ParseInstr(ctx context.Context, line lines.Line, mode flavors.Par
 			}
 		}
 		in.Final = true
-		in.WidthKnown = true
 		in.Width = 0
 		return in, nil
 	}
@@ -221,7 +218,6 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 			return in, err
 		}
 		if isMacro {
-			i.WidthKnown = true
 			i.Width = 0
 			i.Final = true
 			return i, nil
@@ -232,7 +228,6 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 		in.Type = dir.Type
 		in.Var = dir.Var
 		if dir.Func == nil {
-			in.WidthKnown = true
 			in.Width = 0
 			in.Final = true
 			return in, nil
@@ -278,7 +273,6 @@ func (a *Base) parseSetting(ctx context.Context, in inst.I, lp *lines.Parse) (in
 	default:
 		return in, in.Errorf("expecting ON/OFF, found '%s'", in.TextArg)
 	}
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
@@ -330,7 +324,6 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 	if summary.Modes == opcodes.MODE_IMPLIED {
 		op := summary.Ops[0]
 		in.Data = []byte{op.Byte}
-		in.WidthKnown = true
 		in.Width = 1
 		in.Final = true
 		in.Mode = opcodes.MODE_IMPLIED
@@ -358,7 +351,6 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 			panic(fmt.Sprintf("%s doesn't support accumulator mode", in.Command))
 		}
 		in.Data = []byte{op.Byte}
-		in.WidthKnown = true
 		in.Width = 1
 		in.Final = true
 		in.Mode = opcodes.MODE_A
@@ -387,7 +379,6 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 				panic(fmt.Sprintf("%s doesn't support accumulator mode", in.Command))
 			}
 			in.Data = []byte{op.Byte}
-			in.WidthKnown = true
 			in.Width = 1
 			in.Final = true
 			in.Mode = opcodes.MODE_A
@@ -441,7 +432,6 @@ func (a *Base) ParseOrg(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I
 	if err != nil {
 		return in, err
 	}
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	in.Addr = val
@@ -483,7 +473,6 @@ func (a *Base) ParseAscii(ctx context.Context, in inst.I, lp *lines.Parse) (inst
 		}
 	}
 	in.Width = uint16(len(in.Data))
-	in.WidthKnown = true
 	in.Final = true
 	return in, nil
 }
@@ -500,7 +489,6 @@ func (a *Base) ParseBlockStorage(ctx context.Context, in inst.I, lp *lines.Parse
 		return in, in.Errorf("Cannot evaluate size of block storage on first pass")
 	}
 
-	in.WidthKnown = true
 	in.Final = true
 	in.Width = val
 	return in, nil
@@ -520,7 +508,6 @@ func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.
 	}
 	switch in.Var {
 	case inst.VarBytes:
-		in.WidthKnown = true
 		in.Width = uint16(len(in.Exprs))
 		in.Final = true
 		for _, expr := range in.Exprs {
@@ -528,11 +515,11 @@ func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.
 			if err != nil {
 				in.Final = false
 				in.Data = nil
+				break
 			}
 			in.Data = append(in.Data, byte(val))
 		}
 	case inst.VarWordsLe, inst.VarWordsBe:
-		in.WidthKnown = true
 		in.Width = 2 * uint16(len(in.Exprs))
 		in.Final = true
 		for _, expr := range in.Exprs {
@@ -540,6 +527,7 @@ func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.
 			if err != nil {
 				in.Final = false
 				in.Data = nil
+				break
 			}
 			if in.Var == inst.VarWordsLe {
 				in.Data = append(in.Data, byte(val), byte(val>>8))
@@ -548,7 +536,6 @@ func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.
 			}
 		}
 	case inst.VarMixed:
-		in.WidthKnown = true
 		in.Final = true
 		for _, expr := range in.Exprs {
 			in.Width += expr.Width()
@@ -582,7 +569,6 @@ func (a *Base) ParseDo(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I,
 		return in, err
 	}
 	in.Exprs = append(in.Exprs, expr)
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
@@ -601,7 +587,6 @@ func (a *Base) ParseEquate(ctx context.Context, in inst.I, lp *lines.Parse) (ins
 	}
 	_ = xyzzy
 	in.Exprs = append(in.Exprs, expr)
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
@@ -629,7 +614,6 @@ func (a *Base) ParseHexString(ctx context.Context, in inst.I, lp *lines.Parse) (
 			break
 		}
 	}
-	in.WidthKnown = true
 	in.Width = uint16(len(in.Data))
 	in.Final = true
 	return in, nil
@@ -641,7 +625,6 @@ func (a *Base) ParseInclude(ctx context.Context, in inst.I, lp *lines.Parse) (in
 		return in, in.Errorf("Expecting filename, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
@@ -654,7 +637,6 @@ func (a *Base) ParseMacroStart(ctx context.Context, in inst.I, lp *lines.Parse) 
 		return in, in.Errorf("Expecting valid macro name, found '%c'", lp.Next())
 	}
 	in.TextArg = lp.Emit()
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
@@ -663,14 +645,12 @@ func (a *Base) ParseMacroStart(ctx context.Context, in inst.I, lp *lines.Parse) 
 // For assemblers where the macro name is the label, followed by the directive.
 func (a *Base) MarkMacroStart(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	in.TextArg, in.Label = in.Label, ""
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil
 }
 
 func (a *Base) ParseNoArgDir(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil

@@ -71,10 +71,6 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return parseErr
 		}
 
-		if mode == flavors.ParseModeNormal && !in.WidthKnown {
-			return in.Errorf("Width unknown")
-		}
-
 		if _, err := a.passInst(&in, false); err != nil {
 			return err
 		}
@@ -253,7 +249,11 @@ func (a *Assembler) RawBytes() ([]byte, error) {
 		if !in.Final {
 			return []byte{}, in.Errorf("cannot finalize value: %s", in)
 		}
-		result = append(result, in.Data...)
+		data := in.Data
+		for len(data) < int(in.Width) {
+			data = append(data, 0x00)
+		}
+		result = append(result, data...)
 	}
 	return result, nil
 }

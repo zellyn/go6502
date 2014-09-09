@@ -139,3 +139,14 @@ It's a bit tricky:
   4. Evaluate instructions.
 
 
+
+** How it works now
+asm.Load
+  for each line:
+    Flavor.ParseInstr(...)
+    passInst
+      Set address if ORG
+      in.Compute
+      Update addr
+asm.Pass2
+  passInst

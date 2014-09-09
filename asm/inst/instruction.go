@@ -66,13 +66,10 @@ type I struct {
 	TextArg      string                 // Text of argument part
 	Exprs        []*expr.E              // Expression(s)
 	Data         []byte                 // Actual bytes
-	WidthKnown   bool                   // Do we know how many bytes this instruction takes yet?
 	Width        uint16                 // width in bytes
 	Final        bool                   // Do we know the actual bytes yet?
 	Op           byte                   // Opcode
 	Mode         opcodes.AddressingMode // Opcode mode
-	ZeroMode     opcodes.AddressingMode // Possible ZP-option mode
-	ZeroOp       byte                   // Possible ZP-option Opcode
 	Value        uint16                 // For Equates, the value
 	DeclaredLine uint16                 // Line number listed in file
 	Line         *lines.Line            // Line object for this line
@@ -216,7 +213,6 @@ func (i *I) Compute(c context.Context, final bool) (bool, error) {
 	}
 
 	// Everything else is zero-width
-	i.WidthKnown = true
 	i.Width = 0
 	i.Final = true
 
@@ -225,7 +221,6 @@ func (i *I) Compute(c context.Context, final bool) (bool, error) {
 
 func (i *I) computeData(c context.Context, final bool) (bool, error) {
 	if len(i.Data) > 0 {
-		i.WidthKnown = true
 		i.Width = uint16(len(i.Data))
 		i.Final = true
 		return true, nil
@@ -274,7 +269,6 @@ func (i *I) computeData(c context.Context, final bool) (bool, error) {
 		}
 	}
 	i.Width = width
-	i.WidthKnown = true
 	if allFinal {
 		i.Data = data
 		i.Final = true
@@ -287,7 +281,6 @@ func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
 	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err == nil {
 		i.Value = val
-		i.WidthKnown = true
 		i.Final = true
 		i.Width = val
 	} else {
@@ -299,7 +292,6 @@ func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
 }
 
 func (i *I) computeMustKnow(c context.Context, final bool) (bool, error) {
-	i.WidthKnown = true
 	i.Width = 0
 	i.Final = true
 	val, err := i.Exprs[0].Eval(c, i.Line)
@@ -322,12 +314,6 @@ func (i *I) computeMustKnow(c context.Context, final bool) (bool, error) {
 
 func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 	// If the width is not known, we better have a ZeroPage alternative.
-	if !i.WidthKnown && (i.ZeroOp == 0 || i.ZeroMode == 0) {
-		if i.Line.Context != nil && i.Line.Context.Parent != nil {
-			fmt.Println(i.Line.Context.Parent.Sprintf("foo"))
-		}
-		panic(i.Sprintf("Reached computeOp for '%s' with no ZeroPage alternative: %#v [%s]", i.Command, i, i.Line.Text()))
-	}
 	// An op with no args would be final already, so we must have an Expression.
 	if len(i.Exprs) == 0 {
 		panic(fmt.Sprintf("Reached computeOp for '%s' with no expressions", i.Command))
@@ -344,39 +330,10 @@ func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 			return false, err
 		}
 
-		// Already know enough.
-		if i.WidthKnown {
-			return false, nil
-		}
-
-		// Do we know the width, even though the value is unknown?
-		if i.Exprs[0].Width() == 1 {
-			i.WidthKnown = true
-			i.Width = 2
-			i.Op, i.Mode = i.ZeroOp, i.ZeroMode
-			i.ZeroOp, i.ZeroMode = 0, 0
-			return false, nil
-		}
-
-		// Okay, we have to set the width: since we don't know, go wide.
-		i.WidthKnown = true
-		i.Width = 3
-		i.ZeroOp, i.ZeroMode = 0, 0
 		return false, nil
 	}
 
 	// If we got here, we got an actual value.
-
-	// We need to figure out the width
-	if !i.WidthKnown {
-		if val < 0x100 {
-			i.Width = 2
-			i.Op = i.ZeroOp
-			i.Mode = i.ZeroMode
-		} else {
-			i.Width = 3
-		}
-	}
 
 	// It's a branch
 	if i.Mode == opcodes.MODE_RELATIVE {
@@ -391,10 +348,7 @@ func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 		val = uint16(offset)
 	}
 
-	i.WidthKnown = true
 	i.Final = true
-	i.ZeroOp = 0
-	i.ZeroMode = 0
 
 	switch i.Width {
 	case 2:

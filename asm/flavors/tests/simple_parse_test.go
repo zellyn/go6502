@@ -60,6 +60,7 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{mm, " BEQ $2347", "{BEQ/rel $2347}", "f000"},
 		{mm, " DA $12,$34,$1234", "{data/wle $0012,$0034,$1234}", "120034003412"},
 		{mm, " DA $1234", "{data/wle $1234}", "3412"},
+		{mm, " DB <L4,<L5", "{data/b (lsb L4),(lsb L5)}", "deef"},
 		{mm, " DDB $12,$34,$1234", "{data/wbe $0012,$0034,$1234}", "001200341234"},
 		{mm, " DFB $12,$34,$1234", "{data/b $0012,$0034,$1234}", "123434"},
 		{mm, " DFB $34,100,$81A2-$77C4,%1011,>$81A2-$77C4", "{data/b $0034,$0064,(- $81a2 $77c4),$000b,(msb (- $81a2 $77c4))}", "3464de0b09"},
@@ -239,13 +240,13 @@ func TestSimpleCommonFunctions(t *testing.T) {
 			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.f, tt.i, err)
 			continue
 		}
-		if !in.WidthKnown {
-			t.Errorf(`%d. %s.ParseInstr("%s") => WidthKnown=false`, i, tt.f, tt.i)
-			continue
-		}
 		if in.Line.Parse == nil {
 			t.Errorf("Got empty in.Line.Parse on input '%s'", tt.i)
 		}
+
+		ctx.Set("L4", 0xbcde)
+		ctx.Set("L5", 0xcdef)
+
 		if in.Type != inst.TypeOrg {
 			_, err = in.Compute(ctx, true)
 
@@ -263,16 +264,13 @@ func TestSimpleCommonFunctions(t *testing.T) {
 			hx := hex.EncodeToString(in.Data)
 			// xxxxxx sets the width, but doesn't expect actual data
 			if hx != tt.b && (len(tt.b) == 0 || tt.b[0] != 'x') {
-				t.Errorf(`%d. %s.ParseInstr("%s").Data = [%s]; want [%s]`, i, tt.f, tt.i, hx, tt.b)
+				t.Errorf(`%d. %s.ParseInstr("%s").Data = [%s]; want [%s] (%s)`, i, tt.f, tt.i, hx, tt.b, in)
 				continue
 			}
 
 			// Check length
 			w := uint16(len(tt.b) / 2)
-			if !in.WidthKnown {
-				t.Errorf(`%d. %s.WidthKnown is false`, i, in)
-				continue
-			}
+
 			if in.Width != w {
 				t.Errorf(`%d. %s.Width=%d; want %d`, i, in, in.Width, w)
 				continue

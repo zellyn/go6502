@@ -20,3 +20,17 @@ MD5_MONITOR=$(md5 -q monitor.rom)
 [[ $MD5_MONITOR == 'bc0163ca04c463e06f99fb029ad21b1f' ]] || echo 'Wrong checksum for monitor.rom'
 MD5_SWEET16=$(md5 -q sweet16.rom)
 [[ $MD5_SWEET16 == '93e148f5e30cdd574fd1bb3c26798787' ]] || echo 'Wrong checksum for sweet16.rom'
+
+go run a2as.go --in ../../../../goapple2/source/progaid/hires.asm --out hires.rom --flavor redbooka
+go run a2as.go --in ../../../../goapple2/source/progaid/verify.asm --out verify.rom --flavor redbooka
+go run a2as.go --in ../../../../goapple2/source/progaid/ramtest.asm --out ramtest.rom --flavor redbooka
+go run a2as.go --in ../../../../goapple2/source/progaid/music.asm --out music.rom --flavor redbooka
+
+MD5_HIRES=$(md5 -q hires.rom)
+[[ $MD5_HIRES == 'efe22f1a8c94458068fb12ae702b58c4' ]] || echo 'Wrong checksum for hires.rom'
+MD5_MUSIC=$(md5 -q music.rom)
+[[ $MD5_MUSIC == '0ffe796a73410e822fcae5e510374924' ]] || echo 'Wrong checksum for music.rom'
+MD5_RAMTEST=$(md5 -q ramtest.rom)
+[[ $MD5_RAMTEST == '0420635256a3b016323989e3a9fe4ce7' ]] || echo 'Wrong checksum for ramtest.rom'
+MD5_VERIFY=$(md5 -q verify.rom)
+[[ $MD5_VERIFY == '527f420462426e4851b942af46cc7f48' ]] || echo 'Wrong checksum for verify.rom'

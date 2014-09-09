@@ -29,7 +29,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 				return in, in.Errorf("%s (addr,X) doesn't have a wide variant", in.Command)
 			}
 			in.Op = op.Byte
-			in.WidthKnown = true
 			in.Width = 2
 			in.Mode = opcodes.MODE_INDIRECT_X
 			in.Var = inst.VarOpByte
@@ -46,7 +45,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			if forceWide {
 				return in, fmt.Errorf("%s (addr),Y doesn't have a wide variant", in.Command)
 			}
-			in.WidthKnown = true
 			in.Width = 2
 			in.Mode = opcodes.MODE_INDIRECT_Y
 			in.Op = op.Byte
@@ -62,7 +60,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 				return in, in.Errorf("%s doesn't support indirect (addr) mode", in.Command)
 			}
 			in.Op = op.Byte
-			in.WidthKnown = true
 			in.Width = 3
 			in.Mode = opcodes.MODE_INDIRECT
 			in.Var = inst.VarOpWord
@@ -85,7 +82,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		}
 
 		in.Op = op.Byte
-		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_RELATIVE
 		in.Var = inst.VarOpBranch
@@ -107,7 +103,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			panic(fmt.Sprintf("opcode error: %s has no MODE_IMMEDIATE opcode", in.Command))
 		}
 		in.Op = op.Byte
-		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = opcodes.MODE_IMMEDIATE
 		in.Var = inst.VarOpByte
@@ -139,50 +134,77 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		return in, in.Errorf("%s opcode doesn't support %s or %s modes.", zpS, wideS)
 	}
 
-	if !summary.AnyModes(zp) {
-		if !wideOk {
-			panic(fmt.Sprintf("opcode error: %s has no %s opcode", in.Command, wideS))
-		}
+	if !zpOk {
 		in.Op = opWide.Byte
-		in.WidthKnown = true
 		in.Width = 3
 		in.Mode = wide
+		in.Var = inst.VarOpWord
+		in.Mode = wide
+		if valKnown {
+			in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
+			in.Final = true
+		}
 		return in, nil
 	}
-	if !summary.AnyModes(wide) {
-		if !zpOk {
-			panic(fmt.Sprintf("opcode error: %s has no %s opcode", in.Command, zpS))
-		}
+	if !wideOk {
 		if forceWide {
 			return in, fmt.Errorf("%s doesn't have a wide variant", in.Command)
 		}
 		in.Op = opZp.Byte
-		in.WidthKnown = true
 		in.Width = 2
 		in.Mode = zp
+		in.Var = inst.VarOpByte
+		in.Mode = zp
+		if valKnown {
+			in.Data = []byte{in.Op, byte(val)}
+			in.Final = true
+		}
 		return in, nil
 	}
 
 	if forceWide {
 		in.Op = opWide.Byte
-		in.WidthKnown = true
 		in.Width = 3
 		in.Mode = wide
+		in.Var = inst.VarOpWord
+		if valKnown {
+			in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
+			in.Final = true
+		}
 		return in, nil
 	}
 
-	// Okay, we don't know whether it's wide or narrow: store enough info for either.
-	if !zpOk {
-		panic(fmt.Sprintf("opcode error: %s has no %s opcode", in.Command, zpS))
+	if valKnown {
+		if val < 0x100 {
+			in.Op = opZp.Byte
+			in.Data = []byte{in.Op, byte(val)}
+			in.Width = 2
+			in.Var = inst.VarOpByte
+			in.Mode = zp
+			in.Final = true
+			return in, nil
+		}
+		in.Op = opWide.Byte
+		in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
+		in.Width = 3
+		in.Var = inst.VarOpWord
+		in.Mode = wide
+		in.Final = true
+		return in, nil
 	}
-	if !wideOk {
-		panic(fmt.Sprintf("opcode error: %s has no %s opcode", in.Command, wideS))
+
+	if in.Exprs[0].Width() == 1 {
+		in.Op = opZp.Byte
+		in.Mode = zp
+		in.Width = 2
+		in.Var = inst.VarOpByte
+		return in, nil
 	}
+
 	in.Op = opWide.Byte
-	in.ZeroOp = opZp.Byte
 	in.Mode = wide
-	in.ZeroMode = zp
-	in.Width = 2
+	in.Width = 3
+	in.Var = inst.VarOpWord
 	return in, nil
 }
 

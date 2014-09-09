@@ -200,7 +200,6 @@ func (m *Merlin) ParseInclude(ctx context.Context, in inst.I, lp *lines.Parse) (
 		return in, in.Errorf("%s expects filename", in.Command)
 	}
 	in.TextArg = prefix + filename
-	in.WidthKnown = true
 	in.Width = 0
 	in.Final = true
 	return in, nil

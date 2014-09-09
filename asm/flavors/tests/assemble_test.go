@@ -294,6 +294,17 @@ func TestMultiline(t *testing.T) {
 				"         EOM",
 			},
 		}, "a533c535a534e536ea", nil, true},
+
+		// Merlin: DB with unknown addresses
+		{mm, "DB with unknown addresses", []string{
+			"ONE = $0123",
+			"TWO = $4567",
+			" DB <ONE,<$FFFF,<$FFFF,<TWO",
+			" DB <THREE,<FOUR",
+			"THREE = $89ab",
+			"FOUR = $cdef",
+			" NOP",
+		}, nil, "23ffff67abefea", nil, true},
 	}
 
 	for i, tt := range tests {
