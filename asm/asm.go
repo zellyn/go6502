@@ -71,9 +71,14 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return parseErr
 		}
 
-		if _, err := a.passInst(&in, false); err != nil {
-			return err
+		if in.Type == inst.TypeOrg {
+			a.Ctx.SetAddr(in.Addr)
 		}
+
+		// Update address
+		addr := a.Ctx.GetAddr()
+		in.Addr = addr
+		a.Ctx.SetAddr(addr + in.Width)
 
 		switch in.Type {
 		case inst.TypeUnknown:
@@ -200,41 +205,26 @@ func (a *Assembler) initPass() {
 	a.Ctx.SetAddr(a.Flavor.DefaultOrigin())
 }
 
-// passInst performs a pass on a single instruction. It forces the
-// instruction to decide its width, but may not know all the
-// arguments. If final is true, and the instruction cannot be
-// finalized, it returns an error.
-func (a *Assembler) passInst(in *inst.I, final bool) (isFinal bool, err error) {
-	if in.Type == inst.TypeOrg {
-		a.Ctx.SetAddr(in.Addr)
-		return true, nil
-	}
-	isFinal, err = in.Compute(a.Ctx, final)
-	if err != nil {
-		return false, err
-	}
-
-	// Update address
-	addr := a.Ctx.GetAddr()
-	in.Addr = addr
-	a.Ctx.SetAddr(addr + in.Width)
-
-	return isFinal, nil
-}
-
 // Pass2 performs the second assembly pass. It returns an error for
 // any instruction that cannot be finalized.
 func (a *Assembler) Pass2() error {
 	a.initPass()
 
 	for _, in := range a.Insts {
-		instFinal, err := a.passInst(in, true)
+		if in.Type == inst.TypeOrg {
+			a.Ctx.SetAddr(in.Addr)
+			continue
+		}
+
+		err := in.Compute(a.Ctx)
 		if err != nil {
 			return err
 		}
-		if !instFinal {
-			return in.Errorf("cannot finalize instruction: %s", in)
-		}
+
+		// Update address
+		addr := a.Ctx.GetAddr()
+		in.Addr = addr
+		a.Ctx.SetAddr(addr + in.Width)
 	}
 
 	return nil

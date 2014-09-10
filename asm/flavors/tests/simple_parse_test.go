@@ -248,10 +248,8 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		ctx.Set("L5", 0xcdef)
 
 		if in.Type != inst.TypeOrg {
-			_, err = in.Compute(ctx, true)
-
-			if err != nil {
-				t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.f, true) => error: %s`, i, tt.f, tt.i, in, err)
+			if err = in.Compute(ctx); err != nil {
+				t.Errorf(`%d. %s.ParseInstr("%s"): %s.Compute(tt.f) => error: %s`, i, tt.f, tt.i, in, err)
 				continue
 			}
 		}

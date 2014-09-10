@@ -581,11 +581,11 @@ func (a *Base) ParseEquate(ctx context.Context, in inst.I, lp *lines.Parse) (ins
 		return in, err
 	}
 
-	xyzzy, err := expr.Eval(ctx, in.Line)
+	val, err := expr.Eval(ctx, in.Line)
 	if err != nil {
 		return in, err
 	}
-	_ = xyzzy
+	ctx.Set(in.Label, val)
 	in.Exprs = append(in.Exprs, expr)
 	in.Width = 0
 	in.Final = true

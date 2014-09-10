@@ -191,42 +191,36 @@ func (i I) String() string {
 }
 
 // Compute attempts to finalize the instruction.
-func (i *I) Compute(c context.Context, final bool) (bool, error) {
-	// xyzzy - remove
-	if i.Type == TypeOrg {
-		panic("Compute called with TypeOrg")
-		return true, nil
-	}
+func (i *I) Compute(c context.Context) error {
 	if i.Type == TypeEqu || i.Type == TypeTarget {
-		return i.computeMustKnow(c, final)
+		return i.computeMustKnow(c)
 	}
 	if i.Final {
-		return true, nil
+		return nil
 	}
 	switch i.Type {
 	case TypeOp:
-		return i.computeOp(c, final)
+		return i.computeOp(c)
 	case TypeData:
-		return i.computeData(c, final)
+		return i.computeData(c)
 	case TypeBlock:
-		return i.computeBlock(c, final)
+		panic("Compute called with TypeBlock")
 	}
 
 	// Everything else is zero-width
 	i.Width = 0
 	i.Final = true
 
-	return true, nil
+	return nil
 }
 
-func (i *I) computeData(c context.Context, final bool) (bool, error) {
+func (i *I) computeData(c context.Context) error {
 	if len(i.Data) > 0 {
 		i.Width = uint16(len(i.Data))
 		i.Final = true
-		return true, nil
+		return nil
 	}
 
-	allFinal := true
 	data := []byte{}
 	var width uint16
 	for _, e := range i.Exprs {
@@ -240,15 +234,9 @@ func (i *I) computeData(c context.Context, final bool) (bool, error) {
 			w = 2
 		}
 		width += w
-		val, labelMissing, err := e.CheckedEval(c, i.Line)
-		if err != nil && !labelMissing {
-			return false, err
-		}
-		if labelMissing {
-			allFinal = false
-			if final {
-				return false, err
-			}
+		val, err := e.Eval(c, i.Line)
+		if err != nil {
+			return err
 		}
 		switch i.Var {
 		case VarMixed:
@@ -269,12 +257,9 @@ func (i *I) computeData(c context.Context, final bool) (bool, error) {
 		}
 	}
 	i.Width = width
-	if allFinal {
-		i.Data = data
-		i.Final = true
-	}
-
-	return i.Final, nil
+	i.Data = data
+	i.Final = true
+	return nil
 }
 
 func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
@@ -291,46 +276,36 @@ func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
 	return i.Final, nil
 }
 
-func (i *I) computeMustKnow(c context.Context, final bool) (bool, error) {
+func (i *I) computeMustKnow(c context.Context) error {
 	i.Width = 0
 	i.Final = true
 	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err != nil {
-		return false, err
+		return err
 	}
 	i.Value = val
 	switch i.Type {
 	case TypeTarget:
-		return false, errors.New("Target not implemented yet.")
+		return errors.New("Target not implemented yet.")
 	case TypeOrg:
 		c.SetAddr(val)
 	case TypeEqu:
 		c.Set(i.Label, val)
 		// Don't handle labels.
-		return true, nil
+		return nil
 	}
-	return true, nil
+	return nil
 }
 
-func (i *I) computeOp(c context.Context, final bool) (bool, error) {
-	// If the width is not known, we better have a ZeroPage alternative.
+func (i *I) computeOp(c context.Context) error {
 	// An op with no args would be final already, so we must have an Expression.
 	if len(i.Exprs) == 0 {
 		panic(fmt.Sprintf("Reached computeOp for '%s' with no expressions", i.Command))
 	}
-	val, labelMissing, err := i.Exprs[0].CheckedEval(c, i.Line)
+	val, err := i.Exprs[0].Eval(c, i.Line)
 	// A real error
-	if !labelMissing && err != nil {
-		return false, err
-	}
-
-	if labelMissing {
-		// Don't know, do care.
-		if final {
-			return false, err
-		}
-
-		return false, nil
+	if err != nil {
+		return err
 	}
 
 	// If we got here, we got an actual value.
@@ -340,10 +315,10 @@ func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 		curr := c.GetAddr()
 		offset := int32(val) - (int32(curr) + 2)
 		if offset > 127 {
-			return false, i.Errorf("%s cannot jump forward %d (max 127) from $%04x to $%04x", i.Command, offset, curr+2, val)
+			return i.Errorf("%s cannot jump forward %d (max 127) from $%04x to $%04x", i.Command, offset, curr+2, val)
 		}
 		if offset < -128 {
-			return false, i.Errorf("%s cannot jump back %d (max -128) from $%04x to $%04x", i.Command, offset, curr+2, val)
+			return i.Errorf("%s cannot jump back %d (max -128) from $%04x to $%04x", i.Command, offset, curr+2, val)
 		}
 		val = uint16(offset)
 	}
@@ -359,7 +334,7 @@ func (i *I) computeOp(c context.Context, final bool) (bool, error) {
 	default:
 		panic(fmt.Sprintf("computeOp reached erroneously for '%s'", i.Command))
 	}
-	return true, nil
+	return nil
 }
 
 func (i I) Errorf(format string, a ...interface{}) error {
