@@ -30,7 +30,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			}
 			in.Op = op.Byte
 			in.Width = 2
-			in.Mode = opcodes.MODE_INDIRECT_X
 			in.Var = inst.VarOpByte
 			if valKnown {
 				in.Final = true
@@ -46,7 +45,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 				return in, fmt.Errorf("%s (addr),Y doesn't have a wide variant", in.Command)
 			}
 			in.Width = 2
-			in.Mode = opcodes.MODE_INDIRECT_Y
 			in.Op = op.Byte
 			in.Var = inst.VarOpByte
 			if valKnown {
@@ -61,7 +59,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			}
 			in.Op = op.Byte
 			in.Width = 3
-			in.Mode = opcodes.MODE_INDIRECT
 			in.Var = inst.VarOpWord
 			if valKnown {
 				in.Final = true
@@ -83,7 +80,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 
 		in.Op = op.Byte
 		in.Width = 2
-		in.Mode = opcodes.MODE_RELATIVE
 		in.Var = inst.VarOpBranch
 		if valKnown {
 			b, err := RelativeAddr(c, in, val)
@@ -104,7 +100,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		}
 		in.Op = op.Byte
 		in.Width = 2
-		in.Mode = opcodes.MODE_IMMEDIATE
 		in.Var = inst.VarOpByte
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val)}
@@ -137,9 +132,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 	if !zpOk {
 		in.Op = opWide.Byte
 		in.Width = 3
-		in.Mode = wide
 		in.Var = inst.VarOpWord
-		in.Mode = wide
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
 			in.Final = true
@@ -152,9 +145,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		}
 		in.Op = opZp.Byte
 		in.Width = 2
-		in.Mode = zp
 		in.Var = inst.VarOpByte
-		in.Mode = zp
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val)}
 			in.Final = true
@@ -165,7 +156,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 	if forceWide {
 		in.Op = opWide.Byte
 		in.Width = 3
-		in.Mode = wide
 		in.Var = inst.VarOpWord
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
@@ -180,7 +170,6 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Data = []byte{in.Op, byte(val)}
 			in.Width = 2
 			in.Var = inst.VarOpByte
-			in.Mode = zp
 			in.Final = true
 			return in, nil
 		}
@@ -188,21 +177,18 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
 		in.Width = 3
 		in.Var = inst.VarOpWord
-		in.Mode = wide
 		in.Final = true
 		return in, nil
 	}
 
 	if in.Exprs[0].Width() == 1 {
 		in.Op = opZp.Byte
-		in.Mode = zp
 		in.Width = 2
 		in.Var = inst.VarOpByte
 		return in, nil
 	}
 
 	in.Op = opWide.Byte
-	in.Mode = wide
 	in.Width = 3
 	in.Var = inst.VarOpWord
 	return in, nil

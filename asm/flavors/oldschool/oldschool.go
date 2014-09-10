@@ -326,7 +326,6 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 		in.Data = []byte{op.Byte}
 		in.Width = 1
 		in.Final = true
-		in.Mode = opcodes.MODE_IMPLIED
 		return in, nil
 	}
 
@@ -353,7 +352,6 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 		in.Data = []byte{op.Byte}
 		in.Width = 1
 		in.Final = true
-		in.Mode = opcodes.MODE_A
 		return in, nil
 	}
 
@@ -381,7 +379,6 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 			in.Data = []byte{op.Byte}
 			in.Width = 1
 			in.Final = true
-			in.Mode = opcodes.MODE_A
 			in.Exprs = nil
 			return in, nil
 

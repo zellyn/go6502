@@ -8,7 +8,6 @@ import (
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
 	"github.com/zellyn/go6502/asm/lines"
-	"github.com/zellyn/go6502/opcodes"
 )
 
 type Type int
@@ -59,22 +58,21 @@ const (
 )
 
 type I struct {
-	Type         Type                   // Type of instruction
-	Label        string                 // Text of label part
-	MacroArgs    []string               // Macro args
-	Command      string                 // Text of command part
-	TextArg      string                 // Text of argument part
-	Exprs        []*expr.E              // Expression(s)
-	Data         []byte                 // Actual bytes
-	Width        uint16                 // width in bytes
-	Final        bool                   // Do we know the actual bytes yet?
-	Op           byte                   // Opcode
-	Mode         opcodes.AddressingMode // Opcode mode
-	Value        uint16                 // For Equates, the value
-	DeclaredLine uint16                 // Line number listed in file
-	Line         *lines.Line            // Line object for this line
-	Addr         uint16                 // Current memory address
-	Var          Variant                // Variant of instruction type
+	Type         Type        // Type of instruction
+	Label        string      // Text of label part
+	MacroArgs    []string    // Macro args
+	Command      string      // Text of command part
+	TextArg      string      // Text of argument part
+	Exprs        []*expr.E   // Expression(s)
+	Data         []byte      // Actual bytes
+	Width        uint16      // width in bytes
+	Final        bool        // Do we know the actual bytes yet?
+	Op           byte        // Opcode
+	Value        uint16      // For Equates, the value
+	DeclaredLine uint16      // Line number listed in file
+	Line         *lines.Line // Line object for this line
+	Addr         uint16      // Current memory address
+	Var          Variant     // Variant of instruction type
 }
 
 func (i I) TypeString() string {
@@ -127,37 +125,7 @@ func (i I) TypeString() string {
 	case TypeSetting:
 		return "set"
 	case TypeOp:
-		modeStr := "?"
-		switch i.Mode {
-		case opcodes.MODE_IMPLIED:
-			modeStr = "imp"
-		case opcodes.MODE_ABSOLUTE:
-			modeStr = "abs"
-		case opcodes.MODE_INDIRECT:
-			modeStr = "ind"
-		case opcodes.MODE_RELATIVE:
-			modeStr = "rel"
-		case opcodes.MODE_IMMEDIATE:
-			modeStr = "imm"
-		case opcodes.MODE_ABS_X:
-			modeStr = "absX"
-		case opcodes.MODE_ABS_Y:
-			modeStr = "absY"
-		case opcodes.MODE_ZP:
-			modeStr = "zp"
-		case opcodes.MODE_ZP_X:
-			modeStr = "zpX"
-		case opcodes.MODE_ZP_Y:
-			modeStr = "zpY"
-		case opcodes.MODE_INDIRECT_Y:
-			modeStr = "indY"
-		case opcodes.MODE_INDIRECT_X:
-			modeStr = "indX"
-		case opcodes.MODE_A:
-			modeStr = "a"
-
-		}
-		return fmt.Sprintf("%s/%s", i.Command, modeStr)
+		return i.Command
 	}
 	return "?"
 }
@@ -311,7 +279,7 @@ func (i *I) computeOp(c context.Context) error {
 	// If we got here, we got an actual value.
 
 	// It's a branch
-	if i.Mode == opcodes.MODE_RELATIVE {
+	if i.Var == VarOpBranch {
 		curr := c.GetAddr()
 		offset := int32(val) - (int32(curr) + 2)
 		if offset > 127 {
