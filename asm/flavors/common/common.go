@@ -8,8 +8,6 @@ import (
 	"github.com/zellyn/go6502/opcodes"
 )
 
-const xyzzy = false
-
 // DecodeOp contains the common code that decodes an Opcode, once we
 // have fully parsed it.
 func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect bool, xy rune, forceWide bool) (inst.I, error) {

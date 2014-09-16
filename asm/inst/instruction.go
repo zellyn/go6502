@@ -160,9 +160,6 @@ func (i I) String() string {
 
 // Compute attempts to finalize the instruction.
 func (i *I) Compute(c context.Context) error {
-	if i.Type == TypeEqu || i.Type == TypeTarget {
-		return i.computeMustKnow(c)
-	}
 	if i.Final {
 		return nil
 	}
@@ -171,12 +168,10 @@ func (i *I) Compute(c context.Context) error {
 		return i.computeOp(c)
 	case TypeData:
 		return i.computeData(c)
-	case TypeBlock:
-		panic("Compute called with TypeBlock")
 	}
 
-	// Everything else is zero-width
-	i.Width = 0
+	// Everything else is already final
+	// TODO(zellyn): warn if we reach here?
 	i.Final = true
 
 	return nil
@@ -245,8 +240,6 @@ func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
 }
 
 func (i *I) computeMustKnow(c context.Context) error {
-	i.Width = 0
-	i.Final = true
 	val, err := i.Exprs[0].Eval(c, i.Line)
 	if err != nil {
 		return err

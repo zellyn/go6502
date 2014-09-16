@@ -71,8 +71,11 @@ func (a *Assembler) Load(filename string, prefix int) error {
 			return parseErr
 		}
 
-		if in.Type == inst.TypeOrg {
+		switch in.Type {
+		case inst.TypeOrg:
 			a.Ctx.SetAddr(in.Addr)
+		case inst.TypeTarget:
+			return in.Errorf("target not implemented yet")
 		}
 
 		// Update address
@@ -211,8 +214,17 @@ func (a *Assembler) Pass2() error {
 	a.initPass()
 
 	for _, in := range a.Insts {
-		if in.Type == inst.TypeOrg {
+		switch in.Type {
+		case inst.TypeOrg:
 			a.Ctx.SetAddr(in.Addr)
+			continue
+		case inst.TypeEqu:
+			val, err := in.Exprs[0].Eval(a.Ctx, in.Line)
+			if err != nil {
+				return err
+			}
+			in.Value = val
+			a.Ctx.Set(in.Label, val)
 			continue
 		}
 
