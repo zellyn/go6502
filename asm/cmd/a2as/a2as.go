@@ -13,25 +13,14 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/ihex"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/opcodes"
 )
 
-var flavorsByName map[string]flavors.F
-var flavor string
-
-func init() {
-	flavorsByName = map[string]flavors.F{
-		"merlin":   merlin.New(),
-		"scma":     scma.New(),
-		"redbooka": redbook.NewRedbookA(),
-		"redbookb": redbook.NewRedbookB(),
-	}
-	var names []string
-	for name := range flavorsByName {
-		names = append(names, name)
-	}
-	usage := fmt.Sprintf("assembler flavor: %s", strings.Join(names, ","))
-	flag.StringVar(&flavor, "flavor", "", usage)
-
+var flavorNames = []string{
+	"merlin",
+	"scma",
+	"redbooka",
+	"redbookb",
 }
 
 var infile = flag.String("in", "", "input file")
@@ -40,6 +29,8 @@ var listfile = flag.String("listing", "", "listing file")
 var format = flag.String("format", "binary", "output format: binary/ihex")
 var fill = flag.Uint("fillbyte", 0x00, "byte value to use when filling gaps between assmebler output regions")
 var prefix = flag.Int("prefix", -1, "length of prefix to skip past addresses and bytes, -1 to guess")
+var sweet16 = flag.Bool("sw16", false, "assemble sweet16 opcodes")
+var flavorName = flag.String("flavor", "", fmt.Sprintf("assemble flavor: %s", strings.Join(flavorNames, ",")))
 
 func main() {
 	flag.Parse()
@@ -51,22 +42,36 @@ func main() {
 		fmt.Fprintln(os.Stderr, "no output file specified")
 		os.Exit(1)
 	}
-
-	if flavor == "" {
-		fmt.Fprintln(os.Stderr, "no flavor specified")
-		os.Exit(1)
-	}
-	f, ok := flavorsByName[flavor]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "invalid flavor: '%s'\n", flavor)
-		os.Exit(1)
-	}
 	if *format != "binary" && *format != "ihex" {
 		fmt.Fprintf(os.Stderr, "format must be binary or ihex; got '%s'\n", *format)
 		os.Exit(1)
 	}
 	if *fill > 0xff {
 		fmt.Fprintf(os.Stderr, "fillbyte must be <= 255; got '%s'\n", *format)
+		os.Exit(1)
+	}
+
+	if *flavorName == "" {
+		fmt.Fprintln(os.Stderr, "no flavor specified")
+		os.Exit(1)
+	}
+
+	var f flavors.F
+	var flavor opcodes.Flavor
+	if *sweet16 {
+		flavor |= opcodes.FlavorSweet16
+	}
+	switch *flavorName {
+	case "merlin":
+		f = merlin.New(flavor)
+	case "scma":
+		f = scma.New(flavor)
+	case "redbooka":
+		f = redbook.NewRedbookA(flavor)
+	case "redbookb":
+		f = redbook.NewRedbookB(flavor)
+	default:
+		fmt.Fprintf(os.Stderr, "invalid flavor: '%s'\n", flavor)
 		os.Exit(1)
 	}
 

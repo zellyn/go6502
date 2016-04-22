@@ -9,6 +9,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/opcodes"
 )
 
 // Merlin implements the Merlin-compatible assembler flavor.
@@ -21,9 +22,10 @@ type Merlin struct {
 const whitespace = " \t"
 const macroNameChars = oldschool.Letters + oldschool.Digits + "_"
 
-func New() *Merlin {
+func New(flavors opcodes.Flavor) *Merlin {
 	m := &Merlin{}
 	m.Name = "merlin"
+	m.OpcodesByName = opcodes.ByName(flavors)
 	m.LabelChars = oldschool.Letters + oldschool.Digits + ":"
 	m.LabelColons = oldschool.ReqDisallowed
 	m.ExplicitARegister = oldschool.ReqOptional

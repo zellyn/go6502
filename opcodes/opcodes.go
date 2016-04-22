@@ -273,17 +273,24 @@ type OpSummary struct {
 	Ops   []OpInfo
 }
 
-var ByName map[string]OpSummary
+type Flavor uint16
 
-func init() {
-	ByName = make(map[string]OpSummary)
+const (
+	FlavorUnknown Flavor = iota
+	FlavorSweet16
+)
+
+func ByName(flavors Flavor) map[string]OpSummary {
+	m := make(map[string]OpSummary)
 	for b, oc := range Opcodes {
 		info := OpInfo{oc.Mode, ModeLengths[oc.Mode], b}
-		summary := ByName[oc.Name]
+		summary := m[oc.Name]
 		summary.Modes |= oc.Mode
 		summary.Ops = append(summary.Ops, info)
-		ByName[oc.Name] = summary
+		m[oc.Name] = summary
 	}
+
+	return m
 }
 
 func (s OpSummary) AnyModes(modes AddressingMode) bool {

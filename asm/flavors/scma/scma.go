@@ -8,6 +8,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/opcodes"
 )
 
 // 40 spaces = comment column
@@ -19,9 +20,10 @@ type SCMA struct {
 	oldschool.Base
 }
 
-func New() *SCMA {
+func New(flavors opcodes.Flavor) *SCMA {
 	a := &SCMA{}
 	a.Name = "scma"
+	a.OpcodesByName = opcodes.ByName(flavors)
 	a.LabelChars = oldschool.Letters + oldschool.Digits + ".:"
 	a.LabelColons = oldschool.ReqDisallowed
 	a.ExplicitARegister = oldschool.ReqDisallowed

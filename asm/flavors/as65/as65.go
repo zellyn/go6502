@@ -7,15 +7,20 @@ import (
 	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/opcodes"
 )
 
 // AS65 implements the AS65-compatible assembler flavor.
 // See http://www.kingswood-consulting.co.uk/assemblers/
 
-type AS65 struct{}
+type AS65 struct {
+	OpcodesByName map[string]opcodes.OpSummary
+}
 
-func New() *AS65 {
-	return &AS65{}
+func New(flavors opcodes.Flavor) *AS65 {
+	return &AS65{
+		OpcodesByName: opcodes.ByName(flavors),
+	}
 }
 
 // Parse an entire instruction, or return an appropriate error.

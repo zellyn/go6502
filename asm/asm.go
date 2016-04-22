@@ -13,6 +13,8 @@ import (
 	"github.com/zellyn/go6502/asm/membuf"
 )
 
+// Assembler is the basic assembler struct. It keeps track of its
+// options, the stream of instructions, and defined macros.
 type Assembler struct {
 	Flavor flavors.F
 	Opener lines.Opener
@@ -21,15 +23,18 @@ type Assembler struct {
 	Ctx    *context.SimpleContext
 }
 
+// NewAssembler creates a new assembler with the given flavor and
+// file-opener.
 func NewAssembler(flavor flavors.F, opener lines.Opener) *Assembler {
 	ctx := &context.SimpleContext{}
 	flavor.InitContext(ctx)
-	return &Assembler{
+	a := &Assembler{
 		Flavor: flavor,
 		Opener: opener,
 		Macros: make(map[string]macros.M),
 		Ctx:    ctx,
 	}
+	return a
 }
 
 type ifdef struct {

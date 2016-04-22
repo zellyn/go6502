@@ -8,6 +8,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/oldschool"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/opcodes"
 )
 
 // RedBook implements a Redbook-listing-compatible-ish assembler flavor.
@@ -15,21 +16,22 @@ type RedBook struct {
 	oldschool.Base
 }
 
-func NewRedbookA() *RedBook {
-	r := newRedbook("redbook-a")
+func NewRedbookA(flavors opcodes.Flavor) *RedBook {
+	r := newRedbook("redbook-a", flavors)
 	return r
 }
 
-func NewRedbookB() *RedBook {
-	r := newRedbook("redbook-b")
+func NewRedbookB(flavors opcodes.Flavor) *RedBook {
+	r := newRedbook("redbook-b", flavors)
 	r.ExplicitARegister = oldschool.ReqRequired
 	r.SpacesForComment = 3
 	return r
 }
 
-func newRedbook(name string) *RedBook {
+func newRedbook(name string, flavors opcodes.Flavor) *RedBook {
 	r := &RedBook{}
 	r.Name = name
+	r.OpcodesByName = opcodes.ByName(flavors)
 	r.LabelChars = oldschool.Letters + oldschool.Digits + "."
 	r.LabelColons = oldschool.ReqOptional
 	r.ExplicitARegister = oldschool.ReqRequired

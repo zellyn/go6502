@@ -12,6 +12,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/asm/membuf"
+	"github.com/zellyn/go6502/opcodes"
 )
 
 // h converts from hex or panics.
@@ -29,13 +30,13 @@ func TestMultiline(t *testing.T) {
 	o := lines.NewTestOpener()
 
 	ss := asmFactory(func() *asm.Assembler {
-		return asm.NewAssembler(scma.New(), o)
+		return asm.NewAssembler(scma.New(opcodes.FlavorSweet16), o)
 	})
 	ra := asmFactory(func() *asm.Assembler {
-		return asm.NewAssembler(redbook.NewRedbookA(), o)
+		return asm.NewAssembler(redbook.NewRedbookA(opcodes.FlavorSweet16), o)
 	})
 	mm := asmFactory(func() *asm.Assembler {
-		return asm.NewAssembler(merlin.New(), o)
+		return asm.NewAssembler(merlin.New(opcodes.FlavorSweet16), o)
 	})
 
 	tests := []struct {

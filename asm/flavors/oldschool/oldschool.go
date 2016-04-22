@@ -44,6 +44,7 @@ const (
 type Base struct {
 	Name                string
 	Directives          map[string]DirectiveInfo
+	OpcodesByName       map[string]opcodes.OpSummary
 	Operators           map[string]expr.Operator
 	EquateDirectives    map[string]bool
 	LabelChars          string
@@ -239,15 +240,15 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 		return a.parseSetting(ctx, in, lp)
 	}
 
-	if summary, ok := opcodes.ByName[in.Command]; ok {
+	if summary, ok := a.OpcodesByName[in.Command]; ok {
 		in.Type = inst.TypeOp
 		return a.parseOpArgs(ctx, in, lp, summary, false)
 	}
 
 	// Merlin lets you say "LDA:" or "LDA@" or "LDAZ" to force non-zero-page.
-	if a.SuffixForWide {
+	if a.SuffixForWide && len(in.Command) == 4 {
 		prefix := in.Command[:len(in.Command)-1]
-		if summary, ok := opcodes.ByName[prefix]; ok {
+		if summary, ok := a.OpcodesByName[prefix]; ok {
 			in.Command = prefix
 			in.Type = inst.TypeOp
 			return a.parseOpArgs(ctx, in, lp, summary, true)

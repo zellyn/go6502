@@ -12,14 +12,15 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/opcodes"
 )
 
 func TestSimpleCommonFunctions(t *testing.T) {
-	ss := scma.New()
-	ra := redbook.NewRedbookA()
-	rb := redbook.NewRedbookB()
-	// aa := as65.New()
-	mm := merlin.New()
+	ss := scma.New(opcodes.FlavorSweet16)
+	ra := redbook.NewRedbookA(opcodes.FlavorSweet16)
+	rb := redbook.NewRedbookB(opcodes.FlavorSweet16)
+	// aa := as65.New(opcodes.FlavorSweet16)
+	mm := merlin.New(opcodes.FlavorSweet16)
 
 	tests := []struct {
 		f flavors.F // assembler flavor
@@ -278,9 +279,9 @@ func TestSimpleCommonFunctions(t *testing.T) {
 }
 
 func TestSimpleErrors(t *testing.T) {
-	ss := scma.New()
-	aa := as65.New()
-	mm := merlin.New()
+	ss := scma.New(opcodes.FlavorSweet16)
+	aa := as65.New(opcodes.FlavorSweet16)
+	mm := merlin.New(opcodes.FlavorSweet16)
 
 	tests := []struct {
 		f flavors.F // assembler flavor

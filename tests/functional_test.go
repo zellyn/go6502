@@ -39,7 +39,7 @@ func randomize(k *K64) {
 
 // status prints out the current CPU instruction and register status.
 func status(c cpu.Cpu, m *[65536]byte, cc uint64) string {
-	bytes, text, _ := asm.Disasm(c.PC(), m[c.PC()], m[c.PC()+1], m[c.PC()+2])
+	bytes, text, _ := asm.Disasm(c.PC(), m[c.PC()], m[c.PC()+1], m[c.PC()+2], nil, 0)
 	return fmt.Sprintf("$%04X: %s  %s  A=$%02X X=$%02X Y=$%02X SP=$%02X P=$%08b - %d\n",
 		c.PC(), bytes, text, c.A(), c.X(), c.Y(), c.SP(), c.P(), cc)
 }

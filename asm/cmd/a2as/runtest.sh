@@ -6,6 +6,12 @@ MD5_MONITOR=$(md5 -q monitor.rom)
 [[ $MD5_MONITOR == 'bc0163ca04c463e06f99fb029ad21b1f' ]] || (echo 'Wrong checksum for monitor.rom'; false) || exit 1
 rm -f monitor.rom monitor.lst
 
+echo autostart.rom
+./a2as --in ../../../../goapple2/source/redbook/autostart.asm --out autostart.rom --flavor redbooka --listing autostart.lst --prefix=-1
+MD5_AUTOSTART=$(md5 -q autostart.rom)
+[[ $MD5_AUTOSTART == '8925b695ae0177dd3919dbea2f2f202b' ]] || (echo 'Wrong checksum for autostart.rom'; false) || exit 1
+rm -f autostart.rom autostart.lst
+
 echo miniasm.rom
 ./a2as --in ../../../../goapple2/source/redbook/miniasm.asm --out miniasm.rom --flavor redbooka --listing miniasm.lst --prefix=-1
 MD5_MINIASM=$(md5 -q miniasm.rom)
