@@ -1,4 +1,4 @@
-package flavors
+package tests
 
 import (
 	"encoding/hex"
