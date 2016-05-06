@@ -29,6 +29,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Op = op.Byte
 			in.Width = 2
 			in.Var = inst.VarOpByte
+			in.ModeStr = "indx"
 			if valKnown {
 				in.Final = true
 				in.Data = []byte{in.Op, byte(val)}
@@ -45,6 +46,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Width = 2
 			in.Op = op.Byte
 			in.Var = inst.VarOpByte
+			in.ModeStr = "indy"
 			if valKnown {
 				in.Final = true
 				in.Data = []byte{in.Op, byte(val)}
@@ -58,6 +60,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Op = op.Byte
 			in.Width = 3
 			in.Var = inst.VarOpWord
+			in.ModeStr = "ind"
 			if valKnown {
 				in.Final = true
 				in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
@@ -99,6 +102,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Op = op.Byte
 		in.Width = 2
 		in.Var = inst.VarOpByte
+		in.ModeStr = "imm"
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val)}
 			in.Final = true
@@ -108,16 +112,20 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 
 	var zp, wide opcodes.AddressingMode
 	var zpS, wideS string
+	var zpM, wideM string // ModeStr - for debug printing
 	switch xy {
 	case 'x':
 		zp, wide = opcodes.MODE_ZP_X, opcodes.MODE_ABS_X
 		zpS, wideS = "ZeroPage,X", "Absolute,X"
+		zpM, wideM = "zpx", "absx"
 	case 'y':
 		zp, wide = opcodes.MODE_ZP_Y, opcodes.MODE_ABS_Y
 		zpS, wideS = "ZeroPage,Y", "Absolute,Y"
+		zpM, wideM = "zpy", "absy"
 	default:
 		zp, wide = opcodes.MODE_ZP, opcodes.MODE_ABSOLUTE
 		zpS, wideS = "ZeroPage", "Absolute"
+		zpM, wideM = "zp", "abs"
 	}
 
 	opWide, wideOk := summary.OpForMode(wide)
@@ -131,6 +139,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Op = opWide.Byte
 		in.Width = 3
 		in.Var = inst.VarOpWord
+		in.ModeStr = wideM
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
 			in.Final = true
@@ -144,6 +153,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Op = opZp.Byte
 		in.Width = 2
 		in.Var = inst.VarOpByte
+		in.ModeStr = zpM
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val)}
 			in.Final = true
@@ -155,6 +165,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Op = opWide.Byte
 		in.Width = 3
 		in.Var = inst.VarOpWord
+		in.ModeStr = wideM
 		if valKnown {
 			in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
 			in.Final = true
@@ -168,6 +179,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 			in.Data = []byte{in.Op, byte(val)}
 			in.Width = 2
 			in.Var = inst.VarOpByte
+			in.ModeStr = zpM
 			in.Final = true
 			return in, nil
 		}
@@ -175,6 +187,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Data = []byte{in.Op, byte(val), byte(val >> 8)}
 		in.Width = 3
 		in.Var = inst.VarOpWord
+		in.ModeStr = wideM
 		in.Final = true
 		return in, nil
 	}
@@ -183,12 +196,14 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Op = opZp.Byte
 		in.Width = 2
 		in.Var = inst.VarOpByte
+		in.ModeStr = zpM
 		return in, nil
 	}
 
 	in.Op = opWide.Byte
 	in.Width = 3
 	in.Var = inst.VarOpWord
+	in.ModeStr = wideM
 	return in, nil
 }
 

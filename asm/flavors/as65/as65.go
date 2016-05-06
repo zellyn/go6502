@@ -1,56 +1,95 @@
 package as65
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/zellyn/go6502/asm/context"
-	"github.com/zellyn/go6502/asm/flavors"
+	"github.com/zellyn/go6502/asm/expr"
+	"github.com/zellyn/go6502/asm/flavors/common"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/opcodes"
 )
 
-// AS65 implements the AS65-compatible assembler flavor.
-// See http://www.kingswood-consulting.co.uk/assemblers/
-
-type AS65 struct {
-	OpcodesByName map[string]opcodes.OpSummary
+// As65 implements an as65-compatible assembler flavor.
+type As65 struct {
+	common.Base
 }
 
-func New(flavors opcodes.Flavor) *AS65 {
-	return &AS65{
-		OpcodesByName: opcodes.ByName(flavors),
+func New(sets opcodes.Set) *As65 {
+	a := &As65{}
+	a.Name = "as65"
+	a.OpcodesByName = opcodes.ByName(sets)
+	a.LabelChars = common.Letters + common.Digits + "."
+	a.LabelColons = common.ReqOptional
+	a.ExplicitARegister = common.ReqRequired
+	a.StringEndOptional = true
+	a.CommentChar = ';'
+	a.MsbChars = "/"
+	a.ImmediateChars = "#"
+	a.HexCommas = common.ReqOptional
+	a.DefaultOriginVal = 0x0800
+
+	a.Directives = map[string]common.DirectiveInfo{
+		"ORG":    {inst.TypeOrg, a.ParseOrg, 0},
+		"OBJ":    {inst.TypeNone, nil, 0},
+		"ENDASM": {inst.TypeEnd, a.ParseNoArgDir, 0},
+		"EQU":    {inst.TypeEqu, a.ParseEquate, inst.VarEquNormal},
+		"EPZ":    {inst.TypeEqu, a.ParseEquate, inst.VarEquPageZero},
+		"DFB":    {inst.TypeData, a.ParseData, inst.VarBytes},
+		"DW":     {inst.TypeData, a.ParseData, inst.VarWordsLe},
+		"DDB":    {inst.TypeData, a.ParseData, inst.VarWordsBe},
+		"ASC":    {inst.TypeData, a.ParseAscii, inst.VarAscii},
+		"DCI":    {inst.TypeData, a.ParseAscii, inst.VarAsciiFlip},
+		"HEX":    {inst.TypeData, a.ParseHexString, inst.VarBytes},
+		"PAGE":   {inst.TypeNone, nil, 0}, // New page
+		"TITLE":  {inst.TypeNone, nil, 0}, // Title
+		"SBTL":   {inst.TypeNone, nil, 0}, // Subtitle
+		"SKP":    {inst.TypeNone, nil, 0}, // Skip lines
+		"REP":    {inst.TypeNone, nil, 0}, // Repeat character
+		"CHR":    {inst.TypeNone, nil, 0}, // Set repeated character
 	}
-}
 
-// Parse an entire instruction, or return an appropriate error.
-func (a *AS65) ParseInstr(ctx context.Context, line lines.Line, mode flavors.ParseMode) (inst.I, error) {
-	return inst.I{}, nil
-}
+	a.EquateDirectives = map[string]bool{
+		"EQU": true,
+		"EPZ": true,
+	}
 
-func (a *AS65) Zero() (uint16, error) {
-	return 0, errors.New("Division by zero.")
-}
+	a.Operators = map[string]expr.Operator{
+		"*": expr.OpMul,
+		"/": expr.OpDiv,
+		"+": expr.OpPlus,
+		"-": expr.OpMinus,
+		"<": expr.OpLt,
+		">": expr.OpGt,
+		"=": expr.OpEq,
+	}
 
-func (a *AS65) DefaultOrigin() uint16 {
-	return 0
-}
+	a.InitContextFunc = func(ctx context.Context) {
+		ctx.SetOnOffDefaults(map[string]bool{
+			"MSB": true, // MSB defaults to true, as per manual
+			"LST": true, // Display listing: not used
+		})
+	}
 
-func (a *AS65) ReplaceMacroArgs(line string, args []string, kwargs map[string]string) (string, error) {
-	panic("AS65.ReplaceMacroArgs not implemented yet.")
-}
+	a.SetAsciiVariation = func(ctx context.Context, in *inst.I, lp *lines.Parse) {
+		if in.Command == "ASC" {
+			if ctx.Setting("MSB") {
+				in.Var = inst.VarAsciiHi
+			} else {
+				in.Var = inst.VarAscii
+			}
+			return
+		}
+		if in.Command == "DCI" {
+			in.Var = inst.VarAsciiFlip
+		} else {
+			panic(fmt.Sprintf("Unknown ascii directive: '%s'", in.Command))
+		}
+	}
 
-func (a *AS65) IsNewParentLabel(label string) bool {
-	return label != "" && label[0] != '.'
-}
+	a.FixLabel = a.DefaultFixLabel
+	a.IsNewParentLabel = a.DefaultIsNewParentLabel
 
-func (a *AS65) LocalMacroLabels() bool {
-	return false
-}
-
-func (a *AS65) String() string {
-	return "as65"
-}
-
-func (a *AS65) InitContext(ctx context.Context) {
+	return a
 }

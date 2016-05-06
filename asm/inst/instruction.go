@@ -73,6 +73,8 @@ type I struct {
 	Line         *lines.Line // Line object for this line
 	Addr         uint16      // Current memory address
 	Var          Variant     // Variant of instruction type
+
+	ModeStr string // Mode description, for debug printing
 }
 
 func (i I) TypeString() string {
@@ -125,6 +127,9 @@ func (i I) TypeString() string {
 	case TypeSetting:
 		return "set"
 	case TypeOp:
+		if i.ModeStr != "" {
+			return i.Command + "/" + i.ModeStr
+		}
 		return i.Command
 	}
 	return "?"

@@ -1,4 +1,4 @@
-package oldschool
+package common
 
 import (
 	"encoding/hex"
@@ -11,7 +11,6 @@ import (
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
 	"github.com/zellyn/go6502/asm/flavors"
-	"github.com/zellyn/go6502/asm/flavors/common"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/opcodes"
@@ -240,7 +239,8 @@ func (a *Base) parseCmd(ctx context.Context, in inst.I, lp *lines.Parse, mode fl
 		return a.parseSetting(ctx, in, lp)
 	}
 
-	if summary, ok := a.OpcodesByName[in.Command]; ok {
+	upperCmd := strings.ToUpper(in.Command)
+	if summary, ok := a.OpcodesByName[upperCmd]; ok {
 		in.Type = inst.TypeOp
 		return a.parseOpArgs(ctx, in, lp, summary, false)
 	}
@@ -416,7 +416,7 @@ func (a *Base) parseOpArgs(ctx context.Context, in inst.I, lp *lines.Parse, summ
 		}
 	}
 
-	return common.DecodeOp(ctx, in, summary, indirect, xy, forceWide)
+	return DecodeOp(ctx, in, summary, indirect, xy, forceWide)
 }
 
 func (a *Base) ParseOrg(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {

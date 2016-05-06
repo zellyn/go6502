@@ -16,11 +16,11 @@ import (
 )
 
 func TestSimpleCommonFunctions(t *testing.T) {
-	ss := scma.New(opcodes.FlavorSweet16)
-	ra := redbook.NewRedbookA(opcodes.FlavorSweet16)
-	rb := redbook.NewRedbookB(opcodes.FlavorSweet16)
-	// aa := as65.New(opcodes.FlavorSweet16)
-	mm := merlin.New(opcodes.FlavorSweet16)
+	ss := scma.New(opcodes.SetSweet16)
+	ra := redbook.NewRedbookA(opcodes.SetSweet16)
+	rb := redbook.NewRedbookB(opcodes.SetSweet16)
+	aa := as65.New(opcodes.SetSweet16)
+	mm := merlin.New(opcodes.SetSweet16)
 
 	tests := []struct {
 		f flavors.F // assembler flavor
@@ -28,27 +28,27 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		p string    // printed instruction, expected
 		b string    // bytes, expected
 	}{
-		// {aa, " beq $2343", "{BEQ/rel $2343}", "f0fc"},
-		// {aa, " beq $2345", "{BEQ/rel $2345}", "f0fe"},
-		// {aa, " beq $2347", "{BEQ/rel $2347}", "f000"},
+		{aa, " beq $2343", "{beq $2343}", "f0fc"},
+		{aa, " beq $2345", "{beq $2345}", "f0fe"},
+		{aa, " beq $2347", "{beq $2347}", "f000"},
 		// {aa, " dw $1234", "{data/wle $1234}", "3412"},
-		// {aa, " jmp $1234", "{JMP/abs $1234}", "4c3412"},
-		// {aa, " jmp ($1234)", "{JMP/ind $1234}", "6c3412"},
-		// {aa, " lda #$12", "{LDA/imm (lsb $0012)}", "a912"},
-		// {aa, " lda $12", "{LDA/zp $0012}", "a512"},
-		// {aa, " lda $12,x", "{LDA/zpX $0012}", "b512"},
-		// {aa, " lda $1234", "{LDA/abs $1234}", "ad3412"},
-		// {aa, " lda $1234,x", "{LDA/absX $1234}", "bd3412"},
-		// {aa, " lda ($12),y", "{LDA/indY $0012}", "b112"},
-		// {aa, " lda ($12,x)", "{LDA/indX $0012}", "a112"},
-		// {aa, " ldx $12,y", "{LDX/zpY $0012}", "b612"},
+		{aa, " jmp $1234", "{jmp/abs $1234}", "4c3412"},
+		{aa, " jmp ($1234)", "{jmp/ind $1234}", "6c3412"},
+		{aa, " lda #$12", "{lda/imm (lsb $0012)}", "a912"},
+		{aa, " lda $12", "{lda/zp $0012}", "a512"},
+		{aa, " lda $12,x", "{lda/zpx $0012}", "b512"},
+		{aa, " lda $1234", "{lda/abs $1234}", "ad3412"},
+		{aa, " lda $1234,x", "{lda/absx $1234}", "bd3412"},
+		{aa, " lda ($12),y", "{lda/indy $0012}", "b112"},
+		{aa, " lda ($12,x)", "{lda/indx $0012}", "a112"},
+		{aa, " ldx $12,y", "{ldx/zpy $0012}", "b612"},
 		// {aa, " org $D000", "{org $d000}", ""},
-		// {aa, " rol $12", "{ROL/zp $0012}", "2612"},
-		// {aa, " rol $1234", "{ROL/abs $1234}", "2e3412"},
-		// {aa, " rol a", "{ROL/a}", "2a"},
-		// {aa, " sta $1234,y", "{STA/absY $1234}", "993412"},
-		// {aa, "; Comment", "{-}", ""},
-		// {aa, "Label", "{- 'Label'}", ""},
+		{aa, " rol $12", "{rol/zp $0012}", "2612"},
+		{aa, " rol $1234", "{rol/abs $1234}", "2e3412"},
+		{aa, " rol a", "{rol}", "2a"},
+		{aa, " sta $1234,y", "{sta/absy $1234}", "993412"},
+		{aa, "; Comment", "{-}", ""},
+		{aa, "Label", "{- 'Label'}", ""},
 		// {aa, ` include "FILE.NAME"`, "{inc 'FILE.NAME'}", ""},
 		// {aa, ` title "Title here"`, "{-}", ""},
 		// {ss, " .TA *-1234", "{target (- * $04d2)}", ""},
@@ -70,34 +70,32 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{mm, " HEX 00,01,FF,AB", "{data/b}", "0001ffab"},
 		{mm, " HEX 0001FFAB", "{data/b}", "0001ffab"},
 		{mm, " INCW $42;$43", `{call INCW {"$42", "$43"}}`, ""},
-		{mm, " JMP $1234", "{JMP $1234}", "4c3412"},
-		{mm, " JMP ($1234)", "{JMP $1234}", "6c3412"},
-		{mm, " LDA #$12", "{LDA (lsb $0012)}", "a912"},
-		{mm, " LDA #$1234", "{LDA (lsb $1234)}", "a934"},
-		{mm, " LDA #/$1234", "{LDA (msb $1234)}", "a912"},
-		{mm, " LDA #<$1234", "{LDA (lsb $1234)}", "a934"},
-		{mm, " LDA #>$1234", "{LDA (msb $1234)}", "a912"},
-		{mm, " LDA $12", "{LDA $0012}", "a512"},
-		{mm, " LDA $12", "{LDA $0012}", "a512"},
-		{mm, " LDA $12,X", "{LDA $0012}", "b512"},
-		{mm, " LDA $1234", "{LDA $1234}", "ad3412"},
-		{mm, " LDA $1234", "{LDA $1234}", "ad3412"},
-		{mm, " LDA $1234,X", "{LDA $1234}", "bd3412"},
-		{mm, " LDA ($12),Y", "{LDA $0012}", "b112"},
-		{mm, " LDA ($12,X)", "{LDA $0012}", "a112"},
-		{mm, " LDA: $12", "{LDA $0012}", "ad1200"},
-		{mm, " LDA@ $12", "{LDA $0012}", "ad1200"},
-		{mm, " LDAX $12", "{LDA $0012}", "ad1200"},
-		{mm, " LDX $12,Y", "{LDX $0012}", "b612"},
+		{mm, " JMP $1234", "{JMP/abs $1234}", "4c3412"},
+		{mm, " JMP ($1234)", "{JMP/ind $1234}", "6c3412"},
+		{mm, " LDA #$12", "{LDA/imm (lsb $0012)}", "a912"},
+		{mm, " LDA #$1234", "{LDA/imm (lsb $1234)}", "a934"},
+		{mm, " LDA #/$1234", "{LDA/imm (msb $1234)}", "a912"},
+		{mm, " LDA #<$1234", "{LDA/imm (lsb $1234)}", "a934"},
+		{mm, " LDA #>$1234", "{LDA/imm (msb $1234)}", "a912"},
+		{mm, " LDA $12", "{LDA/zp $0012}", "a512"},
+		{mm, " LDA $12,X", "{LDA/zpx $0012}", "b512"},
+		{mm, " LDA $1234", "{LDA/abs $1234}", "ad3412"},
+		{mm, " LDA $1234,X", "{LDA/absx $1234}", "bd3412"},
+		{mm, " LDA ($12),Y", "{LDA/indy $0012}", "b112"},
+		{mm, " LDA ($12,X)", "{LDA/indx $0012}", "a112"},
+		{mm, " LDA: $12", "{LDA/abs $0012}", "ad1200"},
+		{mm, " LDA@ $12", "{LDA/abs $0012}", "ad1200"},
+		{mm, " LDAX $12", "{LDA/abs $0012}", "ad1200"},
+		{mm, " LDX $12,Y", "{LDX/zpy $0012}", "b612"},
 		{mm, " ORG $D000", "{org $d000}", ""},
 		{mm, " PMC M1($42", `{call M1 {"$42"}}`, ""},
 		{mm, " PMC M1-$42", `{call M1 {"$42"}}`, ""},
 		{mm, " PUT !FILE.NAME", "{inc 'FILE.NAME'}", ""},
-		{mm, " ROL $12", "{ROL $0012}", "2612"},
-		{mm, " ROL $1234", "{ROL $1234}", "2e3412"},
+		{mm, " ROL $12", "{ROL/zp $0012}", "2612"},
+		{mm, " ROL $1234", "{ROL/abs $1234}", "2e3412"},
 		{mm, " ROL", "{ROL}", "2a"},
 		{mm, " SAV OUTFILE", "{-}", ""},
-		{mm, " STA $1234,Y", "{STA $1234}", "993412"},
+		{mm, " STA $1234,Y", "{STA/absy $1234}", "993412"},
 		{mm, "* Comment", "{-}", ""},
 		{mm, "ABC = $800", "{= 'ABC' $0800}", ""},
 		{mm, "L1 = 'A.2", "{= 'L1' (| $0041 $0002)}", ""},
@@ -183,24 +181,24 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{ss, " BEQ $2343", "{BEQ $2343}", "f0fc"},
 		{ss, " BEQ $2345", "{BEQ $2345}", "f0fe"},
 		{ss, " BEQ $2347", "{BEQ $2347}", "f000"},
-		{ss, " CMP #';'+1", "{CMP (lsb (+ $003b $0001))}", "c93c"},
-		{ss, " JMP $1234", "{JMP $1234}", "4c3412"},
-		{ss, " JMP ($1234)", "{JMP $1234}", "6c3412"},
-		{ss, " LDA #$12", "{LDA (lsb $0012)}", "a912"},
-		{ss, " LDA $12", "{LDA $0012}", "a512"},
-		{ss, " LDA $12,X", "{LDA $0012}", "b512"},
-		{ss, " LDA $1234", "{LDA $1234}", "ad3412"},
-		{ss, " LDA $1234,X", "{LDA $1234}", "bd3412"},
-		{ss, " LDA ($12),Y", "{LDA $0012}", "b112"},
-		{ss, " LDA ($12,X)", "{LDA $0012}", "a112"},
-		{ss, " LDX #']+$80", "{LDX (lsb (+ $005d $0080))}", "a2dd"},
-		{ss, " LDX $12,Y", "{LDX $0012}", "b612"},
+		{ss, " CMP #';'+1", "{CMP/imm (lsb (+ $003b $0001))}", "c93c"},
+		{ss, " JMP $1234", "{JMP/abs $1234}", "4c3412"},
+		{ss, " JMP ($1234)", "{JMP/ind $1234}", "6c3412"},
+		{ss, " LDA #$12", "{LDA/imm (lsb $0012)}", "a912"},
+		{ss, " LDA $12", "{LDA/zp $0012}", "a512"},
+		{ss, " LDA $12,X", "{LDA/zpx $0012}", "b512"},
+		{ss, " LDA $1234", "{LDA/abs $1234}", "ad3412"},
+		{ss, " LDA $1234,X", "{LDA/absx $1234}", "bd3412"},
+		{ss, " LDA ($12),Y", "{LDA/indy $0012}", "b112"},
+		{ss, " LDA ($12,X)", "{LDA/indx $0012}", "a112"},
+		{ss, " LDX #']+$80", "{LDX/imm (lsb (+ $005d $0080))}", "a2dd"},
+		{ss, " LDX $12,Y", "{LDX/zpy $0012}", "b612"},
 		{ss, " ROL  Comment after two spaces", "{ROL}", "2a"},
 		{ss, " ROL  X", "{ROL}", "2a"}, // two spaces = comment
-		{ss, " ROL $12", "{ROL $0012}", "2612"},
-		{ss, " ROL $1234", "{ROL $1234}", "2e3412"},
+		{ss, " ROL $12", "{ROL/zp $0012}", "2612"},
+		{ss, " ROL $1234", "{ROL/abs $1234}", "2e3412"},
 		{ss, " ROL", "{ROL}", "2a"},
-		{ss, " STA $1234,Y", "{STA $1234}", "993412"},
+		{ss, " STA $1234,Y", "{STA/absy $1234}", "993412"},
 		{ss, "* Comment", "{-}", ""},
 		{ss, "A.B .EQ *-C.D", "{= 'A.B' (- * C.D)}", ""},
 		{ss, "Label", "{- 'Label'}", ""},
@@ -241,6 +239,10 @@ func TestSimpleCommonFunctions(t *testing.T) {
 			t.Errorf(`%d. %s.ParseInstr("%s") => error: %s`, i, tt.f, tt.i, err)
 			continue
 		}
+		if in.Line == nil {
+			t.Errorf("%d. %s: Got nil in.Line on input %q", i, tt.f, tt.i)
+			continue
+		}
 		if in.Line.Parse == nil {
 			t.Errorf("Got empty in.Line.Parse on input '%s'", tt.i)
 		}
@@ -279,9 +281,9 @@ func TestSimpleCommonFunctions(t *testing.T) {
 }
 
 func TestSimpleErrors(t *testing.T) {
-	ss := scma.New(opcodes.FlavorSweet16)
-	aa := as65.New(opcodes.FlavorSweet16)
-	mm := merlin.New(opcodes.FlavorSweet16)
+	ss := scma.New(opcodes.SetSweet16)
+	aa := as65.New(opcodes.SetSweet16)
+	mm := merlin.New(opcodes.SetSweet16)
 
 	tests := []struct {
 		f flavors.F // assembler flavor

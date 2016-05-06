@@ -6,7 +6,7 @@ import (
 
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
-	"github.com/zellyn/go6502/asm/flavors/oldschool"
+	"github.com/zellyn/go6502/asm/flavors/common"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/opcodes"
@@ -16,26 +16,26 @@ import (
 // See http://en.wikipedia.org/wiki/Merlin_(assembler) and
 // http://www.apple-iigs.info/doc/fichiers/merlin816.pdf‎
 type Merlin struct {
-	oldschool.Base
+	common.Base
 }
 
 const whitespace = " \t"
-const macroNameChars = oldschool.Letters + oldschool.Digits + "_"
+const macroNameChars = common.Letters + common.Digits + "_"
 
-func New(flavors opcodes.Flavor) *Merlin {
+func New(sets opcodes.Set) *Merlin {
 	m := &Merlin{}
 	m.Name = "merlin"
-	m.OpcodesByName = opcodes.ByName(flavors)
-	m.LabelChars = oldschool.Letters + oldschool.Digits + ":"
-	m.LabelColons = oldschool.ReqDisallowed
-	m.ExplicitARegister = oldschool.ReqOptional
+	m.OpcodesByName = opcodes.ByName(sets)
+	m.LabelChars = common.Letters + common.Digits + ":"
+	m.LabelColons = common.ReqDisallowed
+	m.ExplicitARegister = common.ReqOptional
 	m.StringEndOptional = false
 	m.CommentChar = ';'
 	m.BinaryChar = '%'
 	m.LsbChars = "<"
 	m.MsbChars = ">/"
 	m.ImmediateChars = "#"
-	m.HexCommas = oldschool.ReqOptional
+	m.HexCommas = common.ReqOptional
 	m.CharChars = "'"
 	m.InvCharChars = `"`
 	m.MacroArgSep = ";"
@@ -43,7 +43,7 @@ func New(flavors opcodes.Flavor) *Merlin {
 	m.LocalMacroLabelsVal = true
 	m.DefaultOriginVal = 0x8000
 
-	m.Directives = map[string]oldschool.DirectiveInfo{
+	m.Directives = map[string]common.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, m.ParseOrg, 0},
 		"OBJ":    {inst.TypeNone, nil, 0},
 		"ENDASM": {inst.TypeEnd, m.ParseNoArgDir, 0},
@@ -131,7 +131,7 @@ func New(flavors opcodes.Flavor) *Merlin {
 		}
 
 		in.Type = inst.TypeMacroCall
-		lp.IgnoreRun(oldschool.Whitespace)
+		lp.IgnoreRun(common.Whitespace)
 		if !byName {
 			if !lp.AcceptRun(macroNameChars) {
 				c := lp.Next()

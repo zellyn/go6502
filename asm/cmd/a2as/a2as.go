@@ -57,21 +57,21 @@ func main() {
 	}
 
 	var f flavors.F
-	var flavor opcodes.Flavor
+	var set opcodes.Set
 	if *sweet16 {
-		flavor |= opcodes.FlavorSweet16
+		set |= opcodes.SetSweet16
 	}
 	switch *flavorName {
 	case "merlin":
-		f = merlin.New(flavor)
+		f = merlin.New(set)
 	case "scma":
-		f = scma.New(flavor)
+		f = scma.New(set)
 	case "redbooka":
-		f = redbook.NewRedbookA(flavor)
+		f = redbook.NewRedbookA(set)
 	case "redbookb":
-		f = redbook.NewRedbookB(flavor)
+		f = redbook.NewRedbookB(set)
 	default:
-		fmt.Fprintf(os.Stderr, "invalid flavor: '%s'\n", flavor)
+		fmt.Fprintf(os.Stderr, "invalid flavor: %q\n", *flavorName)
 		os.Exit(1)
 	}
 

@@ -273,14 +273,14 @@ type OpSummary struct {
 	Ops   []OpInfo
 }
 
-type Flavor uint16
+type Set uint16
 
 const (
-	FlavorUnknown Flavor = iota
-	FlavorSweet16
+	SetUnknown Set = iota
+	SetSweet16
 )
 
-func ByName(flavors Flavor) map[string]OpSummary {
+func ByName(sets Set) map[string]OpSummary {
 	m := make(map[string]OpSummary)
 	for b, oc := range Opcodes {
 		info := OpInfo{oc.Mode, ModeLengths[oc.Mode], b}

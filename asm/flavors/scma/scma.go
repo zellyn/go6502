@@ -5,7 +5,7 @@ import (
 
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
-	"github.com/zellyn/go6502/asm/flavors/oldschool"
+	"github.com/zellyn/go6502/asm/flavors/common"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/opcodes"
@@ -17,16 +17,16 @@ const commentWhitespacePrefix = "                                        "
 // SCMA implements the S-C Macro Assembler-compatible assembler flavor.
 // See http://www.txbobsc.com/scsc/ and http://stjarnhimlen.se/apple2/
 type SCMA struct {
-	oldschool.Base
+	common.Base
 }
 
-func New(flavors opcodes.Flavor) *SCMA {
+func New(sets opcodes.Set) *SCMA {
 	a := &SCMA{}
 	a.Name = "scma"
-	a.OpcodesByName = opcodes.ByName(flavors)
-	a.LabelChars = oldschool.Letters + oldschool.Digits + ".:"
-	a.LabelColons = oldschool.ReqDisallowed
-	a.ExplicitARegister = oldschool.ReqDisallowed
+	a.OpcodesByName = opcodes.ByName(sets)
+	a.LabelChars = common.Letters + common.Digits + ".:"
+	a.LabelColons = common.ReqDisallowed
+	a.ExplicitARegister = common.ReqDisallowed
 	a.SpacesForComment = 2
 	a.MsbChars = "/"
 	a.ImmediateChars = "#"
@@ -36,7 +36,7 @@ func New(flavors opcodes.Flavor) *SCMA {
 	divZeroVal := uint16(0xffff)
 	a.DivZeroVal = &divZeroVal
 
-	a.Directives = map[string]oldschool.DirectiveInfo{
+	a.Directives = map[string]common.DirectiveInfo{
 		".IN":   {inst.TypeInclude, a.ParseInclude, 0},
 		".OR":   {inst.TypeOrg, a.ParseOrg, 0},
 		".TA":   {inst.TypeTarget, a.ParseNotImplemented, 0},
@@ -107,7 +107,7 @@ func New(flavors opcodes.Flavor) *SCMA {
 		in.Type = inst.TypeMacroCall
 		in.Command = in.Command[1:]
 
-		lp.Consume(oldschool.Whitespace)
+		lp.Consume(common.Whitespace)
 
 		for {
 			s, err := a.ParseMacroArg(in, lp)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/expr"
-	"github.com/zellyn/go6502/asm/flavors/oldschool"
+	"github.com/zellyn/go6502/asm/flavors/common"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/opcodes"
@@ -13,36 +13,36 @@ import (
 
 // RedBook implements a Redbook-listing-compatible-ish assembler flavor.
 type RedBook struct {
-	oldschool.Base
+	common.Base
 }
 
-func NewRedbookA(flavors opcodes.Flavor) *RedBook {
-	r := newRedbook("redbook-a", flavors)
+func NewRedbookA(sets opcodes.Set) *RedBook {
+	r := newRedbook("redbook-a", sets)
 	return r
 }
 
-func NewRedbookB(flavors opcodes.Flavor) *RedBook {
-	r := newRedbook("redbook-b", flavors)
-	r.ExplicitARegister = oldschool.ReqRequired
+func NewRedbookB(sets opcodes.Set) *RedBook {
+	r := newRedbook("redbook-b", sets)
+	r.ExplicitARegister = common.ReqRequired
 	r.SpacesForComment = 3
 	return r
 }
 
-func newRedbook(name string, flavors opcodes.Flavor) *RedBook {
+func newRedbook(name string, sets opcodes.Set) *RedBook {
 	r := &RedBook{}
 	r.Name = name
-	r.OpcodesByName = opcodes.ByName(flavors)
-	r.LabelChars = oldschool.Letters + oldschool.Digits + "."
-	r.LabelColons = oldschool.ReqOptional
-	r.ExplicitARegister = oldschool.ReqRequired
+	r.OpcodesByName = opcodes.ByName(sets)
+	r.LabelChars = common.Letters + common.Digits + "."
+	r.LabelColons = common.ReqOptional
+	r.ExplicitARegister = common.ReqRequired
 	r.StringEndOptional = true
 	r.CommentChar = ';'
 	r.MsbChars = "/"
 	r.ImmediateChars = "#"
-	r.HexCommas = oldschool.ReqOptional
+	r.HexCommas = common.ReqOptional
 	r.DefaultOriginVal = 0x0800
 
-	r.Directives = map[string]oldschool.DirectiveInfo{
+	r.Directives = map[string]common.DirectiveInfo{
 		"ORG":    {inst.TypeOrg, r.ParseOrg, 0},
 		"OBJ":    {inst.TypeNone, nil, 0},
 		"ENDASM": {inst.TypeEnd, r.ParseNoArgDir, 0},
