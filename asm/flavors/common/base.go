@@ -166,10 +166,10 @@ func (a *Base) handleLabel(ctx context.Context, in inst.I) error {
 	}
 
 	lval, lok := ctx.Get(in.Label)
-	if lok && addr != lval {
+	if lok && int64(addr) != lval {
 		return in.Errorf("Trying to set label '%s' to $%04x, but it already has value $%04x", in.Label, addr, lval)
 	}
-	ctx.Set(in.Label, addr)
+	ctx.Set(in.Label, int64(addr))
 	return nil
 }
 
@@ -432,7 +432,7 @@ func (a *Base) ParseOrg(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I
 	}
 	in.Width = 0
 	in.Final = true
-	in.Addr = val
+	in.Addr = uint16(val)
 	return in, nil
 }
 
@@ -488,7 +488,7 @@ func (a *Base) ParseBlockStorage(ctx context.Context, in inst.I, lp *lines.Parse
 	}
 
 	in.Final = true
-	in.Width = val
+	in.Width = uint16(val)
 	return in, nil
 }
 
@@ -552,6 +552,22 @@ func (a *Base) ParseData(ctx context.Context, in inst.I, lp *lines.Parse) (inst.
 						return in, in.Errorf("Unsupported expression width: %d", expr.Width())
 					}
 				}
+			}
+		}
+	case inst.VarBytesZero:
+		in.Final = true
+		if len(in.Exprs) != 1 {
+			return in, in.Errorf("%v expected one expression (length); got %d", in.Command, len(in.Exprs))
+		}
+		val, err := in.Exprs[0].Eval(ctx, in.Line)
+		if err != nil {
+			in.Final = false
+			in.Data = nil
+		} else {
+			in.Final = true
+			in.Width = uint16(val)
+			for i := int(val); i > 0; i-- {
+				in.Data = append(in.Data, 0)
 			}
 		}
 	default:
@@ -738,12 +754,12 @@ func (a *Base) ParseTerm(ctx context.Context, in inst.I, lp *lines.Parse) (*expr
 			return &expr.E{}, in.Errorf("expecting hex number, found '%c' (%d)", c, c)
 		}
 		s := lp.Emit()
-		i, err := strconv.ParseUint(s, 16, 16)
+		i, err := strconv.ParseInt(s, 16, 64)
 		if err != nil {
 			return &expr.E{}, in.Errorf("invalid hex number: %s: %s", s, err)
 		}
 		ex.Op = expr.OpLeaf
-		ex.Val = uint16(i)
+		ex.Val = i
 		return top, nil
 	}
 
@@ -754,24 +770,24 @@ func (a *Base) ParseTerm(ctx context.Context, in inst.I, lp *lines.Parse) (*expr
 			return &expr.E{}, in.Errorf("expecting binary number, found '%c' (%d)", c, c)
 		}
 		s := lp.Emit()
-		i, err := strconv.ParseUint(s, 2, 16)
+		i, err := strconv.ParseInt(s, 2, 64)
 		if err != nil {
 			return &expr.E{}, in.Errorf("invalid binary number: %s: %s", s, err)
 		}
 		ex.Op = expr.OpLeaf
-		ex.Val = uint16(i)
+		ex.Val = i
 		return top, nil
 	}
 
 	// Decimal
 	if lp.AcceptRun(Digits) {
 		s := lp.Emit()
-		i, err := strconv.ParseUint(s, 10, 16)
+		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			return &expr.E{}, in.Errorf("invalid number: %s: %s", s, err)
 		}
 		ex.Op = expr.OpLeaf
-		ex.Val = uint16(i)
+		ex.Val = i
 		return top, nil
 	}
 
@@ -784,7 +800,7 @@ func (a *Base) ParseTerm(ctx context.Context, in inst.I, lp *lines.Parse) (*expr
 			return &expr.E{}, in.Errorf("end of line after quote")
 		}
 		ex.Op = expr.OpLeaf
-		ex.Val = uint16(c)
+		ex.Val = int64(c)
 		if strings.Contains(a.InvCharChars, quote[:1]) {
 			ex.Val |= 0x80
 		}

@@ -3,8 +3,8 @@ package context
 import "fmt"
 
 type Context interface {
-	Set(name string, value uint16)
-	Get(name string) (uint16, bool)
+	Set(name string, value int64)
+	Get(name string) (int64, bool)
 	SetAddr(uint16)
 	GetAddr() uint16
 	DivZero() *uint16
@@ -44,7 +44,7 @@ type SimpleContext struct {
 }
 
 type symbolValue struct {
-	v       uint16
+	v       int64
 	changed bool // Did the value ever change?
 }
 
@@ -54,9 +54,9 @@ func (sc *SimpleContext) fix() {
 	}
 }
 
-func (sc *SimpleContext) Get(name string) (uint16, bool) {
+func (sc *SimpleContext) Get(name string) (int64, bool) {
 	if name == "*" {
-		return sc.GetAddr(), true
+		return int64(sc.GetAddr()), true
 	}
 	sc.fix()
 	s, found := sc.symbols[name]
@@ -71,7 +71,7 @@ func (sc *SimpleContext) GetAddr() uint16 {
 	return sc.addr
 }
 
-func (sc *SimpleContext) Set(name string, value uint16) {
+func (sc *SimpleContext) Set(name string, value int64) {
 	sc.fix()
 	s, found := sc.symbols[name]
 	if found && s.v != value {

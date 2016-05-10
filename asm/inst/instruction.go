@@ -45,6 +45,7 @@ const (
 	VarMixed       // Bytes or words (LE), depending on individual expression widths
 	VarWordsLe     // Data: expressions, but forced to one word per, little-endian
 	VarWordsBe     // Data: expressions, but forced to one word per, big-endian
+	VarBytesZero   // Data: a run of zeros
 	VarAscii       // Data: from ASCII strings, high bit clear
 	VarAsciiFlip   // Data: from ASCII strings, high bit clear, except last char
 	VarAsciiHi     // Data: from ASCII strings, high bit set
@@ -68,7 +69,7 @@ type I struct {
 	Width        uint16      // width in bytes
 	Final        bool        // Do we know the actual bytes yet?
 	Op           byte        // Opcode
-	Value        uint16      // For Equates, the value
+	Value        int64       // For Equates, the value
 	DeclaredLine uint16      // Line number listed in file
 	Line         *lines.Line // Line object for this line
 	Addr         uint16      // Current memory address
@@ -103,6 +104,8 @@ func (i I) TypeString() string {
 			return "data"
 		case VarBytes:
 			return "data/b"
+		case VarBytesZero:
+			return "data/bz"
 		case VarWordsLe:
 			return "data/wle"
 		case VarWordsBe:
@@ -235,7 +238,7 @@ func (i *I) computeBlock(c context.Context, final bool) (bool, error) {
 	if err == nil {
 		i.Value = val
 		i.Final = true
-		i.Width = val
+		i.Width = uint16(val)
 	} else {
 		if final {
 			return false, i.Errorf("block storage with unknown size")
@@ -254,7 +257,7 @@ func (i *I) computeMustKnow(c context.Context) error {
 	case TypeTarget:
 		return errors.New("Target not implemented yet.")
 	case TypeOrg:
-		c.SetAddr(val)
+		c.SetAddr(uint16(val))
 	case TypeEqu:
 		c.Set(i.Label, val)
 		// Don't handle labels.
@@ -286,7 +289,7 @@ func (i *I) computeOp(c context.Context) error {
 		if offset < -128 {
 			return i.Errorf("%s cannot jump back %d (max -128) from $%04x to $%04x", i.Command, offset, curr+2, val)
 		}
-		val = uint16(offset)
+		val = int64(offset)
 	}
 
 	i.Final = true

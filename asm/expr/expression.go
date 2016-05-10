@@ -57,7 +57,7 @@ type E struct {
 	Right *E
 	Op    Operator
 	Text  string
-	Val   uint16
+	Val   int64
 }
 
 func (e E) String() string {
@@ -106,7 +106,7 @@ func (e *E) Width() uint16 {
 	return 2
 }
 
-func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
+func (e *E) Eval(ctx context.Context, ln *lines.Line) (int64, error) {
 	if e == nil {
 		return 0, errors.New("cannot Eval() nil expression")
 	}
@@ -178,7 +178,7 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 				if z == nil {
 					return 0, ln.Errorf("divizion by zero")
 				}
-				return *z, nil
+				return int64(*z), nil
 			}
 			return l / r, nil
 		case OpAnd:
@@ -194,7 +194,7 @@ func (e *E) Eval(ctx context.Context, ln *lines.Line) (uint16, error) {
 }
 
 // CheckedEval calls Eval, but also turns UnknownLabelErrors into labelMissing booleans.
-func (e *E) CheckedEval(ctx context.Context, ln *lines.Line) (val uint16, labelMissing bool, err error) {
+func (e *E) CheckedEval(ctx context.Context, ln *lines.Line) (val int64, labelMissing bool, err error) {
 	val, err = e.Eval(ctx, ln)
 	switch err.(type) {
 	case nil:

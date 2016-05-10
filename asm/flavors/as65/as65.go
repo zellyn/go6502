@@ -37,17 +37,24 @@ func New(sets opcodes.Set) *As65 {
 		"EQU":    {inst.TypeEqu, a.ParseEquate, inst.VarEquNormal},
 		"EPZ":    {inst.TypeEqu, a.ParseEquate, inst.VarEquPageZero},
 		"DFB":    {inst.TypeData, a.ParseData, inst.VarBytes},
-		"DW":     {inst.TypeData, a.ParseData, inst.VarWordsLe},
-		"DDB":    {inst.TypeData, a.ParseData, inst.VarWordsBe},
-		"ASC":    {inst.TypeData, a.ParseAscii, inst.VarAscii},
-		"DCI":    {inst.TypeData, a.ParseAscii, inst.VarAsciiFlip},
-		"HEX":    {inst.TypeData, a.ParseHexString, inst.VarBytes},
-		"PAGE":   {inst.TypeNone, nil, 0}, // New page
-		"TITLE":  {inst.TypeNone, nil, 0}, // Title
-		"SBTL":   {inst.TypeNone, nil, 0}, // Subtitle
-		"SKP":    {inst.TypeNone, nil, 0}, // Skip lines
-		"REP":    {inst.TypeNone, nil, 0}, // Repeat character
-		"CHR":    {inst.TypeNone, nil, 0}, // Set repeated character
+
+		"ds":  {inst.TypeData, a.ParseData, inst.VarBytesZero},
+		"rmb": {inst.TypeData, a.ParseData, inst.VarBytesZero},
+
+		"dw":  {inst.TypeData, a.ParseData, inst.VarWordsLe},
+		"fcw": {inst.TypeData, a.ParseData, inst.VarWordsLe},
+		"fdb": {inst.TypeData, a.ParseData, inst.VarWordsLe},
+
+		"DDB":   {inst.TypeData, a.ParseData, inst.VarWordsBe},
+		"ASC":   {inst.TypeData, a.ParseAscii, inst.VarAscii},
+		"DCI":   {inst.TypeData, a.ParseAscii, inst.VarAsciiFlip},
+		"HEX":   {inst.TypeData, a.ParseHexString, inst.VarBytes},
+		"PAGE":  {inst.TypeNone, nil, 0}, // New page
+		"TITLE": {inst.TypeNone, nil, 0}, // Title
+		"SBTL":  {inst.TypeNone, nil, 0}, // Subtitle
+		"SKP":   {inst.TypeNone, nil, 0}, // Skip lines
+		"REP":   {inst.TypeNone, nil, 0}, // Repeat character
+		"CHR":   {inst.TypeNone, nil, 0}, // Set repeated character
 	}
 
 	a.EquateDirectives = map[string]bool{

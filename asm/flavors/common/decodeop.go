@@ -83,7 +83,7 @@ func DecodeOp(c context.Context, in inst.I, summary opcodes.OpSummary, indirect 
 		in.Width = 2
 		in.Var = inst.VarOpBranch
 		if valKnown {
-			b, err := RelativeAddr(c, in, val)
+			b, err := RelativeAddr(c, in, uint16(val))
 			if err != nil {
 				return in, err
 			}
