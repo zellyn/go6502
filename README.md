@@ -24,6 +24,9 @@ the 6502.
 
 TODOs:
 - [ ] Incorporate recent speedups/simplifications made to perfect6502
+  - [ ] [main 25% speedup](https://github.com/mist64/perfect6502/commit/b2cce8862046d99106ffe8576733acfec849592d)
+  - [ ] [de-dup transistors](https://github.com/mist64/perfect6502/commit/c7ede71e52a3b98e07d05270b3e642ed18102980)
+  - [ ] [bug fix](https://github.com/mist64/perfect6502/commit/aed0d9a3c37cebb48956c7ab9a3dc4ec11e8d862)
 - [ ] Profile and speed up
 - [ ] Write a ridiculous one-goroutine-per-transistor simulation
 
