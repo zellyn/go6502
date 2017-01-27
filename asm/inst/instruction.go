@@ -33,6 +33,7 @@ const (
 	TypeOp         // An actual asm opcode
 	TypeEnd        // End assembly
 	TypeSetting    // An on/off setting toggle
+	TypeDirective  // An assembler directive that was consumed
 )
 
 type Variant int

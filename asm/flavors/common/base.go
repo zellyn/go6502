@@ -436,6 +436,8 @@ func (a *Base) ParseOrg(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I
 	return in, nil
 }
 
+// ParseAscii parses data definition instructions that have some
+// variant of ASCII as their data.
 func (a *Base) ParseAscii(ctx context.Context, in inst.I, lp *lines.Parse) (inst.I, error) {
 	lp.IgnoreRun(Whitespace)
 	a.SetAsciiVariation(ctx, &in, lp)

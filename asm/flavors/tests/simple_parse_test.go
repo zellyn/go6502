@@ -33,6 +33,8 @@ func TestSimpleCommonFunctions(t *testing.T) {
 		{aa, " beq $2347", "{beq $2347}", "f000"},
 		{aa, " dw $1234", "{data/wle $1234}", "3412"},
 		{aa, " ds 5", "{data/bz $0005}", "0000000000"},
+		// TODO(zellyn): make this work.
+		// {aa, ` db "\aError\r\n",0`, "{data/b xyzzy}", "4572726f720d0a00"},
 		{aa, " jmp $1234", "{jmp/abs $1234}", "4c3412"},
 		{aa, " jmp ($1234)", "{jmp/ind $1234}", "6c3412"},
 		{aa, " lda #$12", "{lda/imm (lsb $0012)}", "a912"},
