@@ -4,6 +4,7 @@ go6502
 A 6502 emulator, simulator, and assembler(s), written in Go.
 
 [![Build Status](https://travis-ci.org/zellyn/go6502.svg?branch=master)](https://travis-ci.org/zellyn/go6502)
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
 
 This repository should probably be split up. It contains:
 
