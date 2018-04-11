@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/zellyn/go6502/opcodes"
+	"github.com/zellyn/go6502/asm/opcodes"
 )
 
 // Symbols are symbol tables used to convert addresses to names

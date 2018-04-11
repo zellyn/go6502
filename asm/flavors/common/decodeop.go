@@ -5,7 +5,7 @@ import (
 
 	"github.com/zellyn/go6502/asm/context"
 	"github.com/zellyn/go6502/asm/inst"
-	"github.com/zellyn/go6502/opcodes"
+	"github.com/zellyn/go6502/asm/opcodes"
 )
 
 // DecodeOp contains the common code that decodes an Opcode, once we

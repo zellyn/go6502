@@ -12,7 +12,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/lines"
 	"github.com/zellyn/go6502/asm/membuf"
-	"github.com/zellyn/go6502/opcodes"
+	"github.com/zellyn/go6502/asm/opcodes"
 )
 
 // h converts from hex or panics.

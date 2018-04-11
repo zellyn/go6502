@@ -13,7 +13,7 @@ import (
 	"github.com/zellyn/go6502/asm/flavors"
 	"github.com/zellyn/go6502/asm/inst"
 	"github.com/zellyn/go6502/asm/lines"
-	"github.com/zellyn/go6502/opcodes"
+	"github.com/zellyn/go6502/asm/opcodes"
 )
 
 const Letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
