@@ -47,7 +47,7 @@ var SegDefs = [NODES]bool{
 	true,  // 27
 	false, // 28
 	true,  // 29
-	false, // 30 - unused
+	true,  // 30 - unused
 	true,  // 31
 	false, // 32
 	true,  // 33
@@ -161,7 +161,7 @@ var SegDefs = [NODES]bool{
 	true,  // 141
 	true,  // 142
 	true,  // 143
-	false, // 144 - unused
+	true,  // 144 - unused
 	true,  // 145
 	true,  // 146
 	false, // 147
@@ -190,7 +190,7 @@ var SegDefs = [NODES]bool{
 	false, // 170
 	false, // 171
 	true,  // 172
-	false, // 173 - unused
+	true,  // 173 - unused
 	true,  // 174
 	false, // 175
 	true,  // 176
@@ -307,7 +307,7 @@ var SegDefs = [NODES]bool{
 	true,  // 287
 	true,  // 288
 	false, // 289
-	false, // 290 - unused
+	true,  // 290 - unused
 	true,  // 291
 	false, // 292
 	true,  // 293
@@ -428,7 +428,7 @@ var SegDefs = [NODES]bool{
 	false, // 408
 	true,  // 409
 	true,  // 410
-	false, // 411 - unused
+	true,  // 411 - unused
 	true,  // 412
 	false, // 413
 	false, // 414
@@ -514,7 +514,7 @@ var SegDefs = [NODES]bool{
 	true,  // 494
 	false, // 495
 	true,  // 496
-	false, // 497 - unused
+	true,  // 497 - unused
 	false, // 498
 	true,  // 499
 	true,  // 500
@@ -559,7 +559,7 @@ var SegDefs = [NODES]bool{
 	false, // 539
 	true,  // 540
 	false, // 541
-	false, // 542 - unused
+	true,  // 542 - unused
 	true,  // 543
 	true,  // 544
 	false, // 545
@@ -580,7 +580,7 @@ var SegDefs = [NODES]bool{
 	false, // 560
 	false, // 561
 	false, // 562
-	false, // 563 - unused
+	true,  // 563 - unused
 	true,  // 564
 	true,  // 565
 	true,  // 566
@@ -766,7 +766,7 @@ var SegDefs = [NODES]bool{
 	true,  // 746
 	true,  // 747
 	true,  // 748
-	false, // 749 - unused
+	true,  // 749 - unused
 	true,  // 750
 	false, // 751
 	false, // 752
@@ -925,14 +925,14 @@ var SegDefs = [NODES]bool{
 	true,  // 905
 	true,  // 906
 	false, // 907
-	false, // 908 - unused
+	true,  // 908 - unused
 	true,  // 909
 	true,  // 910
 	false, // 911
 	false, // 912
 	true,  // 913
 	false, // 914
-	false, // 915 - unused
+	true,  // 915 - unused
 	true,  // 916
 	true,  // 917
 	true,  // 918
@@ -1144,7 +1144,7 @@ var SegDefs = [NODES]bool{
 	false, // 1124
 	true,  // 1125
 	false, // 1126
-	false, // 1127 - unused
+	true,  // 1127 - unused
 	false, // 1128
 	true,  // 1129
 	true,  // 1130
@@ -1224,8 +1224,8 @@ var SegDefs = [NODES]bool{
 	true,  // 1204
 	true,  // 1205
 	true,  // 1206
-	false, // 1207 - unused
-	false, // 1208 - unused
+	true,  // 1207 - unused
+	true,  // 1208 - unused
 	true,  // 1209
 	true,  // 1210
 	true,  // 1211
@@ -1278,7 +1278,7 @@ var SegDefs = [NODES]bool{
 	true,  // 1258
 	true,  // 1259
 	true,  // 1260
-	false, // 1261 - unused
+	true,  // 1261 - unused
 	true,  // 1262
 	false, // 1263
 	false, // 1264
@@ -1334,7 +1334,7 @@ var SegDefs = [NODES]bool{
 	true,  // 1314
 	true,  // 1315
 	true,  // 1316
-	false, // 1317 - unused
+	true,  // 1317 - unused
 	true,  // 1318
 	true,  // 1319
 	true,  // 1320
@@ -1378,9 +1378,9 @@ var SegDefs = [NODES]bool{
 	true,  // 1358
 	false, // 1359
 	false, // 1360
-	false, // 1361 - unused
+	true,  // 1361 - unused
 	false, // 1362
-	false, // 1363 - unused
+	true,  // 1363 - unused
 	true,  // 1364
 	false, // 1365
 	false, // 1366
@@ -1478,7 +1478,7 @@ var SegDefs = [NODES]bool{
 	true,  // 1458
 	true,  // 1459
 	true,  // 1460
-	false, // 1461 - unused
+	true,  // 1461 - unused
 	true,  // 1462
 	true,  // 1463
 	true,  // 1464
@@ -1680,7 +1680,7 @@ var SegDefs = [NODES]bool{
 	true,  // 1660
 	false, // 1661
 	true,  // 1662
-	false, // 1663 - unused
+	true,  // 1663 - unused
 	true,  // 1664
 	true,  // 1665
 	false, // 1666
@@ -1718,7 +1718,7 @@ var SegDefs = [NODES]bool{
 	false, // 1698
 	false, // 1699
 	false, // 1700
-	false, // 1701 - unused
+	true,  // 1701 - unused
 	false, // 1702
 	false, // 1703
 	true,  // 1704

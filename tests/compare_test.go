@@ -12,8 +12,8 @@ import (
 	"github.com/zellyn/go6502/asm"
 	"github.com/zellyn/go6502/asm/flavors/scma"
 	"github.com/zellyn/go6502/asm/lines"
+	"github.com/zellyn/go6502/asm/opcodes"
 	"github.com/zellyn/go6502/cpu"
-	"github.com/zellyn/go6502/opcodes"
 	"github.com/zellyn/go6502/visual"
 )
 
