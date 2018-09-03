@@ -11,12 +11,10 @@ package visual
  for original source material:  www.visual6502.org
 */
 
-const NODES = 1725
-
 // SegDefs defines the pullup status of a given segment (by index).
 // Those marked as "unused" are missing in the javascript equivalent
 // file, and set to 2 in the perfect6502 equivalent file.
-var SegDefs = [NODES]bool{
+var SegDefs = []bool{
 	true,  // 0
 	false, // 1
 	false, // 2

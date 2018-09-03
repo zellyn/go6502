@@ -5,72 +5,88 @@ import (
 )
 
 type cpu struct {
-	m              icpu.Memory
-	cycle          uint64
-	nodeValues     []byte   // Bitmask of node values (see const VAL_* below)
-	nodeGates      [][]uint // the list of transistor indexes attached to a node
-	nodeC1C2s      [][]uint // the list of transistor c1/c2s attached to a node
-	nodeDependants [][]uint // all C1 and C2 nodes of transistors attached to a node
+	m     icpu.Memory
+	cycle uint64
 
-	transistorValues []bool
+	nodes       uint // number of nodes
+	transistors uint // number of transistors
 
-	listIn  []uint
-	listOut []uint
+	vss uint
+	vcc uint
 
-	groupList  []uint               // list of node group membership
-	groupSet   [NODES/32 + 1]uint32 // quick check for node group membership
-	groupValue byte                 // presence of vss/vcc/pulldown/pullup/hi in group
+	nodesPullup        bitmap
+	nodesPulldown      bitmap
+	nodesValue         bitmap
+	nodeGates          [][]uint // the list of transistor indexes attached to a node
+	nodeC1C2s          [][]uint // the list of transistor c1/c2s attached to a node
+	nodeDependents     [][]uint // all C1 and C2 nodes of transistors attached to a node
+	nodeLeftDependents [][]uint // TODO(zellyn): doc
+
+	transistorsGate []uint
+	transistorsC1   []uint
+	transistorsC2   []uint
+	transistorsOn   bitmap
+
+	listIn        []uint // the nodes we are working with
+	listOut       []uint // the indirect nodes we are collecting for the next run
+	listOutBitmap bitmap
+
+	group              []uint
+	groupBitmap        bitmap
+	groupContainsValue groupContains
 }
 
-// Bitfield for node values.
+type groupContains uint8
+
 const (
-	VAL_HI = 1 << iota // We count on this being bit 0, so we can mask it out for 0 or 1.
-	VAL_PULLUP
-	VAL_PULLDOWN
-	VAL_VCC
-	VAL_VSS
+	CONTAINS_NOTHING groupContains = iota
+	CONTAINS_HI
+	CONTAINS_PULLUP
+	CONTAINS_PULLDOWN
+	CONTAINS_VCC
+	CONTAINS_VSS
 )
 
-// The lookup table for the group value. If vss is in the group, it's 0, vcc makes it 1, etc.
-// vss, vcc, pulldown, pullup, hi
-var GroupValues = [32]byte{
-	0, // 00000 - nothing
-	1, // 00001 - contains at least one hi node
-	1, // 00010 - contains at least one pullup
-	1, // 00011 - contains at least one pullup
-	0, // 00100 - contains at least one pulldown
-	0, // 00101 - contains at least one pulldown
-	0, // 00110 - contains at least one pulldown
-	0, // 00111 - contains at least one pulldown
-	1, // 01000 - contains vcc
-	1, // 01001 - contains vcc
-	1, // 01010 - contains vcc
-	1, // 01011 - contains vcc
-	1, // 01100 - contains vcc
-	1, // 01101 - contains vcc
-	1, // 01110 - contains vcc
-	1, // 01111 - contains vcc
-	0, // 10000- contains vss
-	0, // 10001- contains vss
-	0, // 10010- contains vss
-	0, // 10011- contains vss
-	0, // 10100- contains vss
-	0, // 10101- contains vss
-	0, // 10110- contains vss
-	0, // 10111- contains vss
-	0, // 11000- contains vss
-	0, // 11001- contains vss
-	0, // 11010- contains vss
-	0, // 11011- contains vss
-	0, // 11100- contains vss
-	0, // 11101- contains vss
-	0, // 11110- contains vss
-	0, // 11111- contains vss
-}
+// // The lookup table for the group value. If vss is in the group, it's 0, vcc makes it 1, etc.
+// // vss, vcc, pulldown, pullup, hi
+// var GroupValues = [32]byte{
+// 	0, // 00000 - nothing
+// 	1, // 00001 - contains at least one hi node
+// 	1, // 00010 - contains at least one pullup
+// 	1, // 00011 - contains at least one pullup
+// 	0, // 00100 - contains at least one pulldown
+// 	0, // 00101 - contains at least one pulldown
+// 	0, // 00110 - contains at least one pulldown
+// 	0, // 00111 - contains at least one pulldown
+// 	1, // 01000 - contains vcc
+// 	1, // 01001 - contains vcc
+// 	1, // 01010 - contains vcc
+// 	1, // 01011 - contains vcc
+// 	1, // 01100 - contains vcc
+// 	1, // 01101 - contains vcc
+// 	1, // 01110 - contains vcc
+// 	1, // 01111 - contains vcc
+// 	0, // 10000- contains vss
+// 	0, // 10001- contains vss
+// 	0, // 10010- contains vss
+// 	0, // 10011- contains vss
+// 	0, // 10100- contains vss
+// 	0, // 10101- contains vss
+// 	0, // 10110- contains vss
+// 	0, // 10111- contains vss
+// 	0, // 11000- contains vss
+// 	0, // 11001- contains vss
+// 	0, // 11010- contains vss
+// 	0, // 11011- contains vss
+// 	0, // 11100- contains vss
+// 	0, // 11101- contains vss
+// 	0, // 11110- contains vss
+// 	0, // 11111- contains vss
+// }
 
 func NewCPU(memory icpu.Memory) icpu.Cpu {
 	c := cpu{m: memory}
-	c.setupNodesAndTransistors()
+	c.setupNodesAndTransistors(TransDefs, SegDefs, NODE_vss, NODE_vcc)
 	return &c
 }
 
@@ -79,9 +95,9 @@ func (c *cpu) SetPC(uint16) {
 	panic("Not implemented")
 }
 
-// --------------------------------
-// Interfacing and extracting state
-// --------------------------------
+/************************************/
+/* Interfacing and extracting state */
+/************************************/
 
 func (c *cpu) Read8(n0, n1, n2, n3, n4, n5, n6, n7 uint) byte {
 	return (c.nodeBit(n0) | c.nodeBit(n1)<<1 | c.nodeBit(n2)<<2 | c.nodeBit(n3)<<3 |
@@ -136,7 +152,10 @@ func (c *cpu) PC() uint16 {
 }
 
 func (c *cpu) nodeBit(n uint) byte {
-	return c.nodeValues[n] & VAL_HI // 1
+	if c.getNodeValue(n) {
+		return 1
+	}
+	return 0
 }
 
 func (c *cpu) writeDataBus(d byte) {
@@ -147,17 +166,6 @@ func (c *cpu) writeDataBus(d byte) {
 }
 
 func (c *cpu) Reset() {
-	// All nodes down
-	for i := range c.nodeValues {
-		c.nodeValues[i] &^= VAL_HI
-	}
-
-	// All transistors off
-
-	for i := range c.transistorValues {
-		c.transistorValues[i] = false
-	}
-
 	c.setNode(NODE_res, false)
 	c.setNode(NODE_clk0, true)
 	c.setNode(NODE_rdy, true)
@@ -165,7 +173,7 @@ func (c *cpu) Reset() {
 	c.setNode(NODE_irq, true)
 	c.setNode(NODE_nmi, true)
 
-	c.recalcAllNodes()
+	c.stabilizeChip()
 
 	// Hold RESET for 8 cycles
 	for i := 0; i < 8; i++ {
@@ -173,146 +181,9 @@ func (c *cpu) Reset() {
 	}
 
 	c.setNode(NODE_res, true)
+	c.recalcNodeList()
 
 	c.cycle = 0
-}
-
-func (c *cpu) switchLists() {
-	c.listIn, c.listOut = c.listOut, c.listIn
-}
-
-func (c *cpu) addNodeToGroup(n uint) {
-	index := n >> 5
-	mask := uint32(1 << (n & 0x1f))
-	if c.groupSet[index]&mask > 0 {
-		return
-	}
-
-	c.groupSet[index] |= mask
-	c.groupList = append(c.groupList, n)
-
-	c.groupValue |= c.nodeValues[n]
-	if n == NODE_vss || n == NODE_vcc {
-		return
-	}
-
-	/* revisit all transistors that are controlled by this node */
-	for _, tn := range c.nodeC1C2s[n] {
-		if c.transistorValues[tn] {
-			if TransDefs[tn].c1 == n {
-				c.addNodeToGroup(TransDefs[tn].c2)
-			} else {
-				c.addNodeToGroup(TransDefs[tn].c1)
-			}
-		}
-	}
-}
-
-func (c *cpu) addAllNodesToGroup(node uint) {
-	c.groupList = c.groupList[0:0]
-	c.groupValue = 0
-
-	c.addNodeToGroup(node)
-}
-
-func (c *cpu) recalcNode(node uint) {
-	/*
-	 * get all nodes that are connected through
-	 * transistors, starting with this one
-	 */
-	c.addAllNodesToGroup(node)
-
-	/* get the state of the group */
-	newv := GroupValues[c.groupValue]
-
-	/*
-	 * - set all nodes to the group state
-	 * - check all transistors switched by nodes of the group
-	 * - collect all nodes behind toggled transistors
-	 *   for the next run
-	 */
-	for _, nn := range c.groupList {
-		c.groupSet[nn>>5] = 0 // Clear as we go
-		if c.nodeValues[nn]&VAL_HI != newv {
-			c.nodeValues[nn] ^= VAL_HI
-			for _, tn := range c.nodeGates[nn] {
-				c.transistorValues[tn] = !c.transistorValues[tn]
-			}
-			c.listOut = append(c.listOut, nn)
-		}
-	}
-}
-
-func (c *cpu) recalcNodeList(nodes []uint) {
-	c.listOut = c.listOut[0:0]
-
-	for _, n := range nodes {
-		c.recalcNode(n)
-	}
-
-	c.switchLists()
-
-	for j := 0; j < 100; j++ { /* loop limiter */
-		if len(c.listIn) == 0 {
-			break
-		}
-		c.listOut = c.listOut[0:0]
-
-		/*
-		 * for all nodes, follow their paths through
-		 * turned-on transistors, find the state of the
-		 * path and assign it to all nodes, and re-evaluate
-		 * all transistors controlled by this path, collecting
-		 * all nodes that changed because of it for the next run
-		 */
-		for _, n := range c.listIn {
-			for _, d := range c.nodeDependants[n] {
-				c.recalcNode(d)
-			}
-		}
-		/*
-		 * make the secondary list our primary list, use
-		 * the data storage of the primary list as the
-		 * secondary list
-		 */
-		c.switchLists()
-	}
-}
-
-func (c *cpu) recalcAllNodes() {
-	temp := make([]uint, NODES)
-	for i := uint(0); i < NODES; i++ {
-		temp[i] = i
-	}
-	c.recalcNodeList(temp)
-}
-
-/**************/
-/* Node State */
-/**************/
-
-// So we don't have to keep re-allocating
-var oneNode = []uint{0}
-
-func (c *cpu) setNode(nn uint, state bool) {
-	oldState := c.nodeValues[nn]
-	newState := oldState
-	if state {
-		newState &^= VAL_PULLDOWN
-		newState |= VAL_PULLUP
-	} else {
-		newState &^= VAL_PULLUP
-		newState |= VAL_PULLDOWN
-	}
-	if newState != oldState {
-		c.nodeValues[nn] = newState
-		oneNode[0] = nn
-		c.recalcNodeList(oneNode)
-	}
-}
-
-func (c *cpu) isNodeHigh(n uint) bool {
-	return c.nodeValues[n]&VAL_HI > 0
 }
 
 // handleMemory is called when clk0 is low, and either reads from or
@@ -328,7 +199,9 @@ func (c *cpu) handleMemory() {
 // HalfStep is the main clock loop, and takes a half clock step.
 func (c *cpu) HalfStep() {
 	clk := c.isNodeHigh(NODE_clk0)
+	/* invert clock */
 	c.setNode(NODE_clk0, !clk)
+	c.recalcNodeList()
 
 	if !clk {
 		c.handleMemory()
@@ -343,58 +216,350 @@ func (c *cpu) Step() error {
 	return nil
 }
 
+/************************/
+/* Algorithms for Nodes */
+/************************/
+
+/*
+ * The "value" propertiy of VCC and GND is never evaluated in the code,
+ * so we don't bother initializing it properly or special-casing writes.
+ */
+
+func (c *cpu) setNodePullup(t uint, s bool) {
+	c.nodesPullup.set(t, s)
+}
+
+func (c *cpu) getNodePullup(t uint) bool {
+	return c.nodesPullup.get(t)
+}
+
+func (c *cpu) setNodePulldown(t uint, s bool) {
+	c.nodesPulldown.set(t, s)
+}
+
+func (c *cpu) getNodePulldown(t uint) bool {
+	return c.nodesPulldown.get(t)
+}
+
+func (c *cpu) setNodeValue(t uint, s bool) {
+	c.nodesValue.set(t, s)
+}
+
+func (c *cpu) getNodeValue(t uint) bool {
+	return c.nodesValue.get(t)
+}
+
+/******************************/
+/* Algorithms for Transistors */
+/******************************/
+
+func (c *cpu) setTransistorOn(t uint, s bool) {
+	c.transistorsOn.set(t, s)
+}
+
+func (c *cpu) getTransistorOn(t uint) bool {
+	return c.transistorsOn.get(t)
+}
+
+/************************/
+/* Algorithms for Lists */
+/************************/
+
+func (c *cpu) switchLists() {
+	c.listIn, c.listOut = c.listOut, c.listIn
+}
+
+func (c *cpu) clearListOut() {
+	c.listOut = c.listOut[:0]
+	c.listOutBitmap.clear()
+}
+
+func (c *cpu) listOutAdd(i uint) {
+	if !c.listOutBitmap.get(i) {
+		c.listOut = append(c.listOut, i)
+		c.listOutBitmap.set(i, true)
+	}
+}
+
+/**********************************/
+/* Algorithms for Groups of Nodes */
+/**********************************/
+
+/*
+ * a group is a set of connected nodes, which consequently
+ * share the same value
+ *
+ * we use an array and a count for O(1) insert and
+ * iteration, and a redundant bitmap for O(1) lookup
+ */
+
+func (c *cpu) groupClear() {
+	c.group = c.group[:0]
+	c.groupBitmap.clear()
+}
+
+func (c *cpu) groupAdd(i uint) {
+	c.group = append(c.group, i)
+	c.groupBitmap.set(i, true)
+}
+
+func (c *cpu) groupContains(el uint) bool {
+	return c.groupBitmap.get(el)
+}
+
+func (c *cpu) groupCount() uint {
+	return uint(len(c.group))
+}
+
+/*********************************/
+/* Node and Transistor Emulation */
+/*********************************/
+
+func (c *cpu) addNodeToGroup(n uint) {
+	/*
+	 * We need to stop at vss and vcc, otherwise we'll revisit other groups
+	 * with the same value - just because they all derive their value from
+	 * the fact that they are connected to vcc or vss.
+	 */
+
+	if n == c.vss {
+		c.groupContainsValue = CONTAINS_VSS
+		return
+	}
+
+	if n == c.vcc {
+		if c.groupContainsValue != CONTAINS_VSS {
+			c.groupContainsValue = CONTAINS_VCC
+		}
+		return
+	}
+
+	if c.groupContains(n) {
+		return
+	}
+
+	c.groupAdd(n)
+
+	if c.groupContainsValue < CONTAINS_PULLDOWN && c.getNodePulldown(n) {
+		c.groupContainsValue = CONTAINS_PULLDOWN
+	}
+
+	if c.groupContainsValue < CONTAINS_PULLUP && c.getNodePullup(n) {
+		c.groupContainsValue = CONTAINS_PULLUP
+	}
+
+	if c.groupContainsValue < CONTAINS_HI && c.getNodeValue(n) {
+		c.groupContainsValue = CONTAINS_HI
+	}
+
+	/* revisit all transistors that control this node */
+	for _, tn := range c.nodeC1C2s[n] {
+		/* if the transistor connects c1 and c2... */
+		if c.getTransistorOn(uint(tn)) {
+			/* if original node was connected to c1, continue with c2 */
+			if c.transistorsC1[tn] == n {
+				c.addNodeToGroup(c.transistorsC2[tn])
+			} else {
+				c.addNodeToGroup(c.transistorsC1[tn])
+			}
+		}
+	}
+}
+
+func (c *cpu) addAllNodesToGroup(node uint) {
+	c.groupClear()
+	c.groupContainsValue = CONTAINS_NOTHING
+	c.addNodeToGroup(node)
+}
+
+func (c *cpu) getGroupValue() bool {
+	switch c.groupContainsValue {
+	case CONTAINS_VCC, CONTAINS_PULLUP, CONTAINS_HI:
+		return true
+	case CONTAINS_VSS, CONTAINS_PULLDOWN, CONTAINS_NOTHING:
+		return false
+	}
+	panic("cannot get here")
+}
+
+func (c *cpu) recalcNode(node uint) {
+	/*
+	 * get all nodes that are connected through
+	 * transistors, starting with this one
+	 */
+	c.addAllNodesToGroup(node)
+
+	/* get the state of the group */
+	newv := c.getGroupValue()
+
+	/*
+	 * - set all nodes to the group state
+	 * - check all transistors switched by nodes of the group
+	 * - collect all nodes behind toggled transistors
+	 *   for the next run
+	 */
+	for _, nn := range c.group {
+		if c.getNodeValue(nn) != newv {
+			c.setNodeValue(nn, newv)
+			for _, tn := range c.nodeGates[nn] {
+				c.setTransistorOn(tn, newv)
+			}
+
+			if newv {
+				for _, dp := range c.nodeLeftDependents[nn] {
+					c.listOutAdd(dp)
+				}
+			} else {
+				for _, dp := range c.nodeDependents[nn] {
+					c.listOutAdd(dp)
+				}
+			}
+		}
+	}
+}
+
+func (c *cpu) recalcNodeList() {
+	for j := 0; j < 100; j++ { /* loop limiter */
+		/*
+		 * make the secondary list our primary list, use
+		 * the data storage of the primary list as the
+		 * secondary list
+		 */
+		c.switchLists()
+
+		if len(c.listIn) == 0 {
+			break
+		}
+
+		c.clearListOut()
+
+		/*
+		 * for all nodes, follow their paths through
+		 * turned-on transistors, find the state of the
+		 * path and assign it to all nodes, and re-evaluate
+		 * all transistors controlled by this path, collecting
+		 * all nodes that changed because of it for the next run
+		 */
+		for _, n := range c.listIn {
+			c.recalcNode(n)
+		}
+	}
+	c.clearListOut()
+}
+
 /******************/
 /* Initialization */
 /******************/
 
-func (c *cpu) addNodeDependant(a, b uint) {
-	for _, d := range c.nodeDependants[a] {
-		if b == d {
+func (c *cpu) addNodeDependent(a uint, b uint) {
+	for _, dp := range c.nodeDependents[a] {
+		if dp == b {
 			return
 		}
 	}
-	c.nodeDependants[a] = append(c.nodeDependants[a], b)
+	c.nodeDependents[a] = append(c.nodeDependents[a], b)
 }
 
-func (c *cpu) setupNodesAndTransistors() {
-
-	// Zero out bitsets
-	c.transistorValues = make([]bool, TRANSISTORS)
-	c.groupList = make([]uint, 0, NODES)
-	c.nodeValues = make([]byte, NODES)
-	c.nodeGates = make([][]uint, NODES)
-	c.nodeC1C2s = make([][]uint, NODES)
-	c.nodeDependants = make([][]uint, NODES)
-
-	// Copy node data from SegDefs into r/w data structures
-	for i := uint(0); i < NODES; i++ {
-		if SegDefs[i] {
-			c.nodeValues[i] = VAL_PULLUP
+func (c *cpu) addNodeLeftDependent(a uint, b uint) {
+	for _, dp := range c.nodeLeftDependents[a] {
+		if dp == b {
+			return
 		}
-		if i == NODE_vss {
-			c.nodeValues[i] |= VAL_VSS
+	}
+	c.nodeLeftDependents[a] = append(c.nodeLeftDependents[a], b)
+}
+
+func (c *cpu) setupNodesAndTransistors(transDefs []TransDef, nodeIsPullup []bool, vss uint, vcc uint) {
+	c.nodes = uint(len(nodeIsPullup))
+	c.transistors = uint(len(transDefs))
+	c.vss = vss
+	c.vcc = vcc
+	c.nodesPullup = newBitmap(c.nodes)
+	c.nodesPulldown = newBitmap(c.nodes)
+	c.nodesValue = newBitmap(c.nodes)
+
+	c.transistorsOn = newBitmap(c.transistors)
+	c.listOutBitmap = newBitmap(c.nodes)
+	c.groupBitmap = newBitmap(c.nodes)
+
+	c.nodeGates = make([][]uint, c.transistors)
+	c.nodeC1C2s = make([][]uint, c.transistors)
+	c.nodeDependents = make([][]uint, c.nodes, c.nodes)
+	c.nodeLeftDependents = make([][]uint, c.nodes, c.nodes)
+
+	/* copy nodes into r/w data structure */
+	for i, isPullup := range nodeIsPullup {
+		c.setNodePullup(uint(i), isPullup)
+	}
+
+	/* copy transistors into r/w data structure */
+	for _, transDef := range transDefs {
+		found := false
+		for j2, gate := range c.transistorsGate {
+			if gate == transDef.gate &&
+				((c.transistorsC1[j2] == transDef.c1 && c.transistorsC2[j2] == transDef.c2) ||
+					(c.transistorsC1[j2] == transDef.c2 && c.transistorsC2[j2] == transDef.c1)) {
+				found = true
+				break
+			}
 		}
-		if i == NODE_vcc {
-			c.nodeValues[i] |= VAL_VCC
+		if !found {
+			c.transistorsGate = append(c.transistorsGate, transDef.gate)
+			c.transistorsC1 = append(c.transistorsC1, transDef.c1)
+			c.transistorsC2 = append(c.transistorsC2, transDef.c2)
 		}
 	}
 
-	// Cross-reference transistors in nodes data structures
-	for j, t := range TransDefs {
-		i := uint(j)
-		c.nodeGates[t.gate] = append(c.nodeGates[t.gate], i)
-		c.nodeC1C2s[t.c1] = append(c.nodeC1C2s[t.c1], i)
-		c.nodeC1C2s[t.c2] = append(c.nodeC1C2s[t.c2], i)
+	/* cross reference transistors in nodes data structures */
+	for i, gate := range c.transistorsGate {
+		c1 := c.transistorsC1[i]
+		c2 := c.transistorsC2[i]
+		c.nodeGates[gate] = append(c.nodeGates[gate], uint(i))
+		c.nodeC1C2s[c1] = append(c.nodeC1C2s[c1], uint(i))
+		c.nodeC1C2s[c2] = append(c.nodeC1C2s[c2], uint(i))
 	}
 
-	for i := uint(0); i < NODES; i++ {
+	for i := uint(0); i < c.nodes; i++ {
 		for _, t := range c.nodeGates[i] {
-			c.addNodeDependant(i, TransDefs[t].c1)
-			c.addNodeDependant(i, TransDefs[t].c2)
+			c1 := c.transistorsC1[t]
+			if c1 != vss && c1 != vcc {
+				c.addNodeDependent(i, c1)
+			}
+			c2 := c.transistorsC2[t]
+			if c2 != vss && c2 != vcc {
+				c.addNodeDependent(i, c2)
+			}
+			if c1 != vss && c1 != vcc {
+				c.addNodeLeftDependent(i, c1)
+			} else {
+				c.addNodeLeftDependent(i, c2)
+			}
 		}
 	}
 }
 
 func (c *cpu) Print(bool) {
 	panic("not implemented")
+}
+
+func (c *cpu) stabilizeChip() {
+	for i := uint(0); i < c.nodes; i++ {
+		c.listOutAdd(i)
+	}
+	c.recalcNodeList()
+}
+
+/**************/
+/* Node State */
+/**************/
+
+func (c *cpu) setNode(nn uint, s bool) {
+	c.setNodePullup(nn, s)
+	c.setNodePulldown(nn, !s)
+	c.listOutAdd(nn)
+	c.recalcNodeList()
+}
+
+func (c *cpu) isNodeHigh(nn uint) bool {
+	return c.getNodeValue(nn)
 }

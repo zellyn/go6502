@@ -208,9 +208,7 @@ type TransDef struct {
 	c2   uint // ...and drain nodes
 }
 
-const TRANSISTORS = 3510
-
-var TransDefs = [TRANSISTORS]TransDef{
+var TransDefs = []TransDef{
 	{10, 176, NODE_vss},
 	{1002, 1211, NODE_vss},
 	{1002, 152, NODE_vss},
