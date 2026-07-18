@@ -125,6 +125,6 @@ func TestDelete(t *testing.T) {
 	m.Delete(0x0, 0x1000)
 	got = m.Pieces()
 	if len(got) != 0 {
-		t.Fatalf("m.Pieces()=%v; want nil or {}", got, want)
+		t.Fatalf("m.Pieces()=%v; want nil or {}", got)
 	}
 }

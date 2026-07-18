@@ -83,7 +83,7 @@ func main() {
 		var err error
 		p, err = lines.GuessFilePrefixSize(*infile, o)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error trying to determine prefix length for file '%s'", *infile, err)
+			fmt.Fprintf(os.Stderr, "Error trying to determine prefix length for file '%s': %v", *infile, err)
 			os.Exit(1)
 		}
 	}

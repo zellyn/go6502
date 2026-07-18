@@ -8,6 +8,7 @@ package cpu
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/zellyn/go6502/asm"
 )
@@ -139,7 +140,8 @@ func status(c *cpu, m Memory) string {
 // Step takes a single step (which will last several cycles, calling Tick() on the Ticker for each).
 func (c *cpu) Step() error {
 	if c.print {
-		fmt.Println(status(c, c.m))
+		// Stderr, so traces don't interleave with program output on stdout.
+		fmt.Fprintln(os.Stderr, status(c, c.m))
 	}
 	c.oldPC = c.r.PC
 	i := c.m.Read(c.r.PC)
